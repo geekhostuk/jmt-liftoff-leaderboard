@@ -1,0 +1,25 @@
+<Project>
+
+  <!-- Single source of truth for the mod version.
+       Bump this, tag the commit v<version>, and the release workflow does the rest.
+       It flows into the assembly metadata AND into JmtLiftoffLeaderboard.BuildInfo,
+       which the BepInPlugin attribute reads. -->
+  <PropertyGroup>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <!-- Build provenance. Overridden by the release script (-p:BuildRevision=<sha>) so a
+       DLL in the wild can be traced back to the commit it came from; "local" for
+       developer builds. -->
+  <PropertyGroup>
+    <BuildRevision Condition="'$(BuildRevision)' == ''">local</BuildRevision>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Product>JMT Liftoff Leaderboard</Product>
+    <Authors>Joe Talbot (geekhost.uk)</Authors>
+    <Copyright>Copyright (c) 2026 Joe Talbot (geekhost.uk)</Copyright>
+    <RepositoryUrl>https://github.com/geekhostuk/jmt-liftoff-leaderboard</RepositoryUrl>
+  </PropertyGroup>
+
+</Project>
