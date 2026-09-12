@@ -34,7 +34,7 @@ namespace JmtLiftoffLeaderboard.Game;
 /// </summary>
 internal sealed class MenuHooks
 {
-    private const string MainMenuScene = "MainMenu";
+    internal const string MainMenuScene = "MainMenu";
     private const string LeaderboardButton = "btnLeaderboards";
     private const string ProfileButton = "btnJmtProfile";
     private const string LevelLoaderField = "levelToLoad";

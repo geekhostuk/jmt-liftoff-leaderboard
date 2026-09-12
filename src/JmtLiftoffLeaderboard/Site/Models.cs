@@ -138,6 +138,70 @@ public sealed class PilotProfile
     [JsonProperty("live_room")] public string? LiveRoom;
 }
 
+public sealed class LicenseRung
+{
+    [JsonProperty("name")] public string Name = "";
+    [JsonProperty("floor")] public double Floor;
+}
+
+/// <summary>
+/// The numbers a Consistency Rating is worked out with. The site sends its own with every
+/// consistency answer, and they are due to be tuned; these defaults are what it used when
+/// this version was written, for an answer that doesn't carry them.
+/// </summary>
+public sealed class CrModel
+{
+    [JsonProperty("max")] public double Max = 5.0;
+    [JsonProperty("midpoint_fpl")] public double MidpointFpl = 2.0;
+    [JsonProperty("prior_laps")] public int PriorLaps = 10;
+    [JsonProperty("window_laps")] public int WindowLaps = 100;
+    [JsonProperty("license_min_laps")] public int LicenseMinLaps = 25;
+    [JsonProperty("pro_min_laps")] public int ProMinLaps = 100;
+
+    /// <summary>Highest first. Replaced by the site's, not added to: Newtonsoft appends to a list it finds already filled.</summary>
+    [JsonProperty("licenses", ObjectCreationHandling = ObjectCreationHandling.Replace)]
+    public List<LicenseRung> Licenses = new()
+    {
+        new() { Name = "Pro", Floor = 4.0 },
+        new() { Name = "A", Floor = 3.5 },
+        new() { Name = "B", Floor = 3.0 },
+        new() { Name = "C", Floor = 2.0 },
+        new() { Name = "D", Floor = 0.0 },
+    };
+
+    /// <summary>A reset is a failed attempt when the attempt it abandoned ran this long or more...</summary>
+    [JsonProperty("too_short_ms")] public int TooShortMs = 5_000;
+    /// <summary>...and no longer than this.</summary>
+    [JsonProperty("idle_ms")] public int IdleMs = 120_000;
+}
+
+/// <summary>One race inside a pilot's CR window.</summary>
+public sealed class CrRace
+{
+    [JsonProperty("failed")] public int Failed;
+    [JsonProperty("laps")] public int Laps;
+}
+
+/// <summary>A pilot's CR, the races it was taken over (newest first), and the numbers behind it.</summary>
+public sealed class PilotConsistency
+{
+    [JsonProperty("pilot")] public PilotRef Pilot = new();
+    [JsonProperty("cr_rating")] public double? CrRating;
+    [JsonProperty("cr_failed")] public int CrFailed;
+    [JsonProperty("cr_laps")] public int CrLaps;
+    [JsonProperty("cr_license")] public string? CrLicense;
+    [JsonProperty("races", ObjectCreationHandling = ObjectCreationHandling.Replace)] public List<CrRace> Races = new();
+    [JsonProperty("model")] public CrModel Model = new();
+}
+
+/// <summary>A room being flown right now, as the site's live page lists it.</summary>
+public sealed class LivePanel
+{
+    [JsonProperty("in_room")] public bool InRoom;
+    [JsonProperty("room_name")] public string RoomName = "";
+    [JsonProperty("pilots")] public List<PilotRef> Pilots = new();
+}
+
 public sealed class ItemCreator
 {
     [JsonProperty("persona_name")] public string? PersonaName;

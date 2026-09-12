@@ -85,6 +85,28 @@ internal sealed class SiteClient
     public void Item(long publishedFileId, Action<Result<ItemInfo>> done) =>
         Get($"/api/items/{publishedFileId}", done);
 
+    /// <summary>
+    /// A board around one pilot, for the HUD: the places above and below theirs, or its last
+    /// places when they aren't on it. Always asked afresh. A site from before <c>around</c>
+    /// ignores it and answers with its top 500, which hold the same places on all but the
+    /// biggest boards.
+    /// </summary>
+    public void LeaderboardAround(long publishedFileId, string? publicId, int above, int below, Action<Result<Leaderboard>> done)
+    {
+        var path = $"/api/timing/leaderboard/{publishedFileId}?limit=500";
+        if (!string.IsNullOrEmpty(publicId))
+            path += $"&around={Uri.EscapeDataString(publicId)}&above={above}&below={below}";
+        Get(path, done, fresh: true);
+    }
+
+    /// <summary>A pilot's CR race by race, for the HUD. Always asked afresh. 404 from a site older than the HUD, too.</summary>
+    public void Consistency(string publicId, Action<Result<PilotConsistency>> done) =>
+        Get($"/api/pilots/{Uri.EscapeDataString(publicId)}/consistency", done, fresh: true);
+
+    /// <summary>The rooms being flown right now, to tell whether the one the pilot is in counts. Always asked afresh.</summary>
+    public void Live(Action<Result<List<LivePanel>>> done) =>
+        Get("/api/timing/live", done, fresh: true);
+
     /// <summary>Drop every kept answer, for a Refresh button.</summary>
     public void Forget() => _answers.Clear();
 
@@ -109,10 +131,10 @@ internal sealed class SiteClient
         _host.StartCoroutine(FetchTexture(url!));
     }
 
-    private void Get<T>(string path, Action<Result<T>> done) where T : class
+    private void Get<T>(string path, Action<Result<T>> done, bool fresh = false) where T : class
     {
         var url = _settings.BaseUrl + path;
-        if (_answers.TryGetValue(url, out var kept) && Time.realtimeSinceStartup - kept.At < FreshForSeconds)
+        if (!fresh && _answers.TryGetValue(url, out var kept) && Time.realtimeSinceStartup - kept.At < FreshForSeconds)
         {
             Deliver(done, new Result<T> { Value = (T)kept.Value, Status = 200 });
             return;

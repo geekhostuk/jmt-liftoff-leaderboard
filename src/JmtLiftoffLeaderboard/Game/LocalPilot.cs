@@ -36,6 +36,12 @@ internal sealed class LocalPilot
         }
     }
 
+    /// <summary>
+    /// Whether the last lookup came back empty because the site couldn't be reached, rather
+    /// than because it knows none of the pilot's ids.
+    /// </summary>
+    public bool SiteUnreachable { get; private set; }
+
     /// <summary>"This is me": remembered in the .cfg, so it holds on the next launch too.</summary>
     public void Choose(string publicId)
     {
@@ -76,6 +82,7 @@ internal sealed class LocalPilot
         {
             if (result.Ok)
             {
+                SiteUnreachable = false;
                 _found = result.Value!.Pilot.PublicId;
                 if (_settings.LastGameUserId.Value != id)
                     _settings.LastGameUserId.Value = id;
@@ -83,11 +90,13 @@ internal sealed class LocalPilot
             }
             else if (result.NotFound)
             {
+                SiteUnreachable = false;
                 TryFrom(ids, next + 1);
             }
             else
             {
                 // The site is down or unreadable; the other ids would fail the same way.
+                SiteUnreachable = true;
                 Finish(null);
             }
         });
