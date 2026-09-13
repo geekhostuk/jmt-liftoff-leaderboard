@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows
 [Semantic Versioning](https://semver.org/) — see [docs/versioning.md](docs/versioning.md).
 
+## [Unreleased]
+
+### Added
+
+- **The lap review, on Ctrl+F7** while flying or from the pause menu, for digging into the
+  delta: your laps on the course this session, and the one you pick taken apart gate by gate.
+  - Compare it with your best ever, your best tonight, your possible lap or the lap before.
+  - The time each stretch between gates gained or lost, the three that lost the most, and a
+    trace of the delta through the lap over your other recent laps.
+  - For every stretch, how your last 10 clean laps flew it against your best for it, and what
+    they give away there on average: where the time goes lap after lap.
+  - Attempts you reset part way are listed too, with the stretches they flew.
+  - The laps are kept until the game closes, the last 20 on each course. The key is
+    `Hud.ReviewKey`, and the delta bar's Ctrl+F8 toolbar has a Review laps button.
+
 ## [0.3.0] — 2026-09-13
 
 ### Added

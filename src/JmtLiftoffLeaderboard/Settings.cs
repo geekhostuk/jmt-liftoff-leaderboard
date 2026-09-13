@@ -124,6 +124,7 @@ internal sealed class Settings
     public HudPanelSettings Consistency { get; }
     public ConfigEntry<KeyboardShortcut> HudPinKey { get; }
     public ConfigEntry<KeyboardShortcut> HudEditKey { get; }
+    public ConfigEntry<KeyboardShortcut> HudReviewKey { get; }
 
     /// <summary>The track board panel, in [HudBoard].</summary>
     public HudPanelSettings Board { get; }
@@ -167,6 +168,8 @@ internal sealed class Settings
             "Keeps the HUD panels on screen while you fly. Press it again to let them fade.");
         HudEditKey = config.Bind("Hud", "EditKey", new KeyboardShortcut(KeyCode.F8, KeyCode.LeftControl),
             "Move, resize, fade and set up the HUD panels with the mouse, while flying or from the pause menu. Press it again, or Done, to finish.");
+        HudReviewKey = config.Bind("Hud", "ReviewKey", new KeyboardShortcut(KeyCode.F7, KeyCode.LeftControl),
+            "Opens the lap review: your laps on the course this session, gate by gate, and where they lose time. While flying or from the pause menu. Press it again, or Esc, to close.");
 
         Board = new HudPanelSettings(config, "HudBoard", "The course's JMT board around your place", HudCorner.TopLeft);
         BoardAbove = config.Bind("HudBoard", "Above", 3,

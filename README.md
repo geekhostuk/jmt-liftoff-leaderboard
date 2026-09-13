@@ -19,6 +19,8 @@ screen while you fly.
 - **Your delta against your best lap while you fly**, with sectors. See
   [below](#delta-bar-while-you-fly).
 - **The race in your room while you fly.** See [below](#the-race-in-your-room).
+- **A lap review on Ctrl+F7:** your laps gate by gate, and where they lose time. See
+  [below](#lap-review).
 - **Liftoff's own leaderboard is one click away.** The "Liftoff leaderboard" button at the top
   opens the game's screen exactly as before, with its ghosts and replays.
 
@@ -134,6 +136,36 @@ course's best** starts a course again.
 It's on screen all the time by default. Like every panel, it can show only at the start and
 after a reset instead, or be switched off.
 
+## Lap review
+
+Press **Ctrl+F7** while flying, or with the pause menu open, which is easiest, to dig into your
+laps on the course. Press it again, **Esc** or **Close** to go back. The delta bar's toolbar in
+Ctrl+F8 has a **Review laps** button too.
+
+- **Your laps this session, newest first:** each one's time and its delta, **PB** on a new best,
+  and attempts you reset part way, with the gate they got to. Click one to take it apart. The
+  newest is shown until you pick another, and new laps join the list as you fly them.
+- **Compared with** your best ever, your best tonight, your possible lap (your best stretch
+  between each pair of gates, flown as one lap) or the lap before it.
+- **Where it lost time:** "Lost most at Gate 7 +0.312, Gate 15 +0.221, Finish +0.180. Gained
+  most at Gate 3 -0.120."
+- **The delta trace:** how far ahead or behind the lap was at every gate, red where a stretch lost
+  time and green where it gained, with your other recent laps faintly behind it so an odd one
+  out shows.
+- **A row for every stretch:** the split, the stretch's time (purple when it's your best ever),
+  a bar and the time gained or lost against the lap it's compared with, the delta so far, and
+  your best for the stretch.
+- **Where the time goes lap after lap.** Each row also has a cell for each of your last 10 clean
+  laps, coloured by how that lap flew the stretch against your best for it: purple your best,
+  green within 3%, yellow within 8%, red more. **Avg lost** is what they give away there on
+  average. The three worst are picked out: "Your last 10 clean laps give away 0.842 a lap to
+  your best stretches, most at Gate 7 +0.280, Gate 15 +0.220".
+- **Your best, best tonight, possible lap, the average and spread of your last 10 clean laps,**
+  and how many of your laps were clean.
+
+Your best lap on each course is kept on this computer, but the laps in the review are kept only
+until the game closes: the last 20 on each course you fly.
+
 ## The race in your room
 
 Another panel shows the race being flown in the room you're in, ranked the way the room's
@@ -179,6 +211,7 @@ finish. It's all saved, and each panel keeps its place at any resolution.
 | `Menu` | `ShowProfileButton` | `true` | Add JMT Profile to the main menu. |
 | `Hud` | `PinKey` | `F8` | Keeps the panels on screen until pressed again. |
 | `Hud` | `EditKey` | `Ctrl+F8` | Move, resize and set up the panels with the mouse. |
+| `Hud` | `ReviewKey` | `Ctrl+F7` | Open the lap review. |
 | `Hud`, `HudBoard`, `HudDelta`, `HudRace` | `Show` | `BetweenAttempts`; `Always` for `HudDelta` | The Consistency Rating (`Hud`), track board (`HudBoard`), delta bar (`HudDelta`) or race (`HudRace`) while flying: `BetweenAttempts`, `Always` or `Off`. |
 | `Hud`, `HudBoard`, `HudDelta`, `HudRace` | `ShowSeconds` | `10` | With `BetweenAttempts`, how long it stays up: `5`, `10`, `20` or `30`. |
 | `Hud`, `HudBoard`, `HudDelta`, `HudRace` | `Corner` | `TopRight`, `TopLeft`, `TopCenter`, `BottomLeft` | Where it keeps to: a corner, or `TopCenter` / `BottomCenter`. Set by dragging it. |

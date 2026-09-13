@@ -9,8 +9,8 @@ namespace JmtLiftoffLeaderboard.Game;
 /// and saved to <see cref="SplitStore"/>, and the local pilot's gates and laps from
 /// <see cref="LocalRun"/> handed to that course's <see cref="DeltaRun"/>.
 ///
-/// Every course flown this session keeps its run, so its best tonight survives flying
-/// another course and coming back.
+/// Every course flown this session keeps its run, so its best tonight and its laps for the
+/// lap review survive flying another course and coming back.
 /// </summary>
 internal sealed class DeltaTracker
 {
@@ -60,6 +60,9 @@ internal sealed class DeltaTracker
     public event Action<LapOutcome>? News;
 
     public bool HasCourse => _run != null;
+
+    /// <summary>The course being flown, with its laps this session, for the lap review.</summary>
+    public DeltaRun? Run => _run;
 
     public string TrackName => _trackName;
 

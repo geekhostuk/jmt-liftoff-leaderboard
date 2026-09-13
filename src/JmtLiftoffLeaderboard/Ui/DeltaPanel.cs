@@ -25,6 +25,7 @@ internal sealed class DeltaPanel : HudPanel
 
     private readonly Settings _settings;
     private readonly DeltaTracker _delta;
+    private readonly Action _openReview;
 
     private Text _state = null!;
     private Text _trend = null!;
@@ -46,10 +47,11 @@ internal sealed class DeltaPanel : HudPanel
     private Action<int>? _paintSectors;
     private Action<int>? _paintRange;
 
-    public DeltaPanel(Settings settings, DeltaTracker delta) : base("Delta", settings.Delta)
+    public DeltaPanel(Settings settings, DeltaTracker delta, Action openReview) : base("Delta", settings.Delta)
     {
         _settings = settings;
         _delta = delta;
+        _openReview = openReview;
         delta.Changed += MarkDirty;
         delta.News += OnNews;
         Watch(settings.DeltaCompare);
@@ -140,6 +142,11 @@ internal sealed class DeltaPanel : HudPanel
         UiKit.OneLine(UiKit.Caption(range, "Bar range"));
         _paintRange = UiKit.Segmented(range, new[] { "±0.5s", "±1s", "±2s" }, RangeIndex(),
             i => _settings.DeltaRange.Value = JmtLiftoffLeaderboard.Settings.DeltaRanges[i]);
+
+        var review = UiKit.Row(section, 8, name: "Review");
+        UiKit.OneLine(UiKit.Label(review, "Where your laps gain and lose time, gate by gate.", 13, Theme.Ink600));
+        UiKit.Spacer(review);
+        UiKit.Button(review, "Review laps", () => _openReview(), UiKit.ButtonKind.Outline, 14, 30);
 
         var forget = UiKit.Row(section, 8, name: "Forget");
         UiKit.OneLine(UiKit.Label(forget, "Your splits are kept for each course on this computer.", 13, Theme.Ink600));

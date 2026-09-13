@@ -24,6 +24,9 @@ namespace JmtLiftoffLeaderboard.Ui;
 /// opacity, how long it stays up and anything of its own. Where a panel is left is kept as
 /// a corner, or the middle of the top or bottom edge, and an offset from it, so it stays
 /// put when the resolution changes. Out of edit mode nothing on the HUD takes a click.
+///
+/// ReviewKey opens the <see cref="LapReview"/> in the same places; the panels step aside
+/// while it's open.
 /// </summary>
 internal sealed class RaceHud
 {
@@ -64,6 +67,7 @@ internal sealed class RaceHud
     private readonly DeltaTracker _delta;
     private readonly RaceTracker _race;
     private readonly List<HudPanel> _panels;
+    private readonly LapReview _review;
 
     private GameObject? _root;
     private Canvas _canvas = null!;
@@ -109,10 +113,11 @@ internal sealed class RaceHud
         {
             new CrPanel(settings.Consistency, cr),
             new BoardPanel(settings, board, room),
-            new DeltaPanel(settings, delta),
+            new DeltaPanel(settings, delta, () => SetReviewing(true)),
             new RacePanel(settings, race, board, room),
         };
         _selected = _panels[0];
+        _review = new LapReview(plugin, settings, delta, () => SetReviewing(false));
 
         run.Spawned += () =>
         {
@@ -151,6 +156,13 @@ internal sealed class RaceHud
         else if (_inFlight && !_overlay.Visible && _settings.HudEditKey.Value.IsDown())
             SetEditing(!_editing);
 
+        if (_review.IsOpen && (!_inFlight || _overlay.Visible))
+            SetReviewing(false);
+        else if (_inFlight && !_overlay.Visible && _settings.HudReviewKey.Value.IsDown())
+            SetReviewing(!_review.IsOpen);
+        else if (_review.IsOpen && Input.GetKeyDown(KeyCode.Escape))
+            SetReviewing(false);
+
         if (!_editing && _inFlight && _settings.HudPinKey.Value.IsDown())
         {
             _pinned = !_pinned;
@@ -161,10 +173,16 @@ internal sealed class RaceHud
         if (_root == null && !_inFlight)
             return;
         Build();
-        var allowed = _inFlight && !_menuOpen && !_overlay.Visible;
+        // The lap review has the screen to itself.
+        var allowed = _inFlight && !_menuOpen && !_overlay.Visible && !_review.IsOpen;
         foreach (var panel in _panels)
             panel.Tick(now, allowed, _editing, _pinned, _dragging == panel, _selected == panel);
 
+        if (_review.IsOpen)
+        {
+            KeepCursor();
+            _review.Tick();
+        }
         if (!_editing)
             return;
         KeepCursor();
@@ -243,6 +261,11 @@ internal sealed class RaceHud
         if (on == _editing)
             return;
         Build();
+        if (on)
+        {
+            SetReviewing(false);
+            TakeMouse();
+        }
         _editing = on;
         _dragging = null;
         _group.blocksRaycasts = on;
@@ -252,22 +275,59 @@ internal sealed class RaceHud
             panel.MarkDirty();
         if (on)
         {
-            _cursorWasVisible = Cursor.visible;
-            _cursorWasLocked = Cursor.lockState;
             RefreshToolbar();
             Plugin.Log.LogInfo("HUD: edit mode. Click a panel to edit it, drag it, scroll over it to resize it.");
         }
         else
         {
-            // The pause menu wants its cursor; in the air, the game had it the way it was.
-            if (!_menuOpen)
-            {
-                Cursor.visible = _cursorWasVisible;
-                Cursor.lockState = _cursorWasLocked;
-            }
+            GiveMouseBack();
             foreach (var panel in _panels)
                 panel.ShowAtStart();
         }
+    }
+
+    /// <summary>The lap review opens over everything, edit mode included, and the panels come back when it closes.</summary>
+    private void SetReviewing(bool on)
+    {
+        if (on == _review.IsOpen)
+            return;
+        if (on)
+        {
+            SetEditing(false);
+            TakeMouse();
+            _review.Open();
+            Plugin.Log.LogInfo("HUD: lap review open.");
+        }
+        else
+        {
+            _review.Close();
+            GiveMouseBack();
+            foreach (var panel in _panels)
+                panel.ShowAtStart();
+        }
+    }
+
+    private bool TakesMouse => _editing || _review.IsOpen;
+
+    /// <summary>Remembers the cursor as the game had it, before edit mode or the review first takes it.</summary>
+    private void TakeMouse()
+    {
+        if (TakesMouse)
+            return;
+        _cursorWasVisible = Cursor.visible;
+        _cursorWasLocked = Cursor.lockState;
+    }
+
+    /// <summary>
+    /// Once neither wants the mouse: the pause menu wants its cursor; in the air, the game
+    /// had it the way it was.
+    /// </summary>
+    private void GiveMouseBack()
+    {
+        if (TakesMouse || _menuOpen)
+            return;
+        Cursor.visible = _cursorWasVisible;
+        Cursor.lockState = _cursorWasLocked;
     }
 
     /// <summary>The game hides the cursor while flying; edit mode needs it.</summary>

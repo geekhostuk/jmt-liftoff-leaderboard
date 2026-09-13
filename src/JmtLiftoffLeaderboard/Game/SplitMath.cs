@@ -148,9 +148,13 @@ internal sealed class DeltaRun
     private const int FinishLineMs = 20;
     /// <summary>How long a finished lap stays on the bar.</summary>
     public const float FinishedSeconds = 3f;
+    /// <summary>How many laps and attempts the lap review keeps for a course.</summary>
+    public const int KeptLaps = 20;
 
     private readonly CourseSplits _course;
     private LapSplits? _tonight;
+    private readonly List<FlownLap> _laps = new();
+    private int _attempts;
     // A different run of gates seen on one clean lap: the course's, if the next clean lap agrees.
     private List<string>? _candidate;
 
@@ -180,6 +184,15 @@ internal sealed class DeltaRun
     }
 
     public CourseSplits Course => _course;
+
+    /// <summary>The best lap since the game started, through the course's gates.</summary>
+    public LapSplits? Tonight => _tonight;
+
+    /// <summary>The laps flown on the course this session, and the attempts reset part way, oldest first: the last <see cref="KeptLaps"/>.</summary>
+    public IReadOnlyList<FlownLap> Laps => _laps;
+
+    /// <summary>Goes up each time a lap or attempt joins <see cref="Laps"/>.</summary>
+    public int LapsVersion { get; private set; }
 
     /// <summary>The course's splits changed and want saving.</summary>
     public bool Dirty { get; set; }
@@ -226,6 +239,7 @@ internal sealed class DeltaRun
             _pendingBase = null;
             _closing = null;
             _closedIndex = null;
+            GaveUp(_lap);
             _lap = new Lap { Whole = true };
         }
         else if (_lastIndex is { } previous && index > previous)
@@ -321,6 +335,7 @@ internal sealed class DeltaRun
 
         var reference = Reference(tonight);
         var outcome = Learn(lap, lapMs);
+        Record(lap, lapMs, outcome);
         _finished = FinishedView(lap, lapMs, reference, tonight, sectorCount, outcome);
         _finishedUntil = at + FinishedSeconds;
         return outcome;
@@ -345,6 +360,7 @@ internal sealed class DeltaRun
         // The start line got here first: the respawn that led to it is old news.
         if (_lap.FromLine && _lap.Gates.Count == 0 && !_lap.Broken)
             return;
+        GaveUp(_lap);
         _lap = new Lap { Whole = true };
         _closing = null;
         _closedIndex = null;
@@ -384,6 +400,36 @@ internal sealed class DeltaRun
         _lap.OnLayout = false;
         _finished = null;
         Dirty = true;
+    }
+
+    // ── The laps for the review ─────────────────────────────────────────────
+
+    /// <summary>
+    /// The lap under way was given up: the run started again. It's kept for the review when it
+    /// was flown from the line and got through a gate, so the stretches before the reset show.
+    /// </summary>
+    private void GaveUp(Lap lap)
+    {
+        if (lap.Gates.Count == 0 || !lap.Whole || !lap.Clocked || lap.Broken)
+            return;
+        Record(lap, null, LapOutcome.Timed);
+    }
+
+    /// <summary>A lap finished, with its time, or an attempt given up, without: the newest in <see cref="Laps"/>.</summary>
+    private void Record(Lap lap, int? lapMs, LapOutcome outcome)
+    {
+        _laps.Add(new FlownLap
+        {
+            Number = ++_attempts,
+            LapMs = lapMs,
+            Gates = new List<string>(lap.Gates),
+            Times = new List<int>(lap.Times),
+            Measured = lap.Whole && lap.Clocked && !lap.Broken,
+            Outcome = outcome,
+        });
+        if (_laps.Count > KeptLaps)
+            _laps.RemoveAt(0);
+        LapsVersion++;
     }
 
     // ── What the bar shows ──────────────────────────────────────────────────
