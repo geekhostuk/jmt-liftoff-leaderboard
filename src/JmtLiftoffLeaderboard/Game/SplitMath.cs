@@ -4,7 +4,7 @@ using System.Collections.Generic;
 // Pure: no Unity, no game, so a scratch harness can compile it on its own and feed it laps.
 namespace JmtLiftoffLeaderboard.Game;
 
-/// <summary>A lap as its gates: which passages, in order, the lap timer at each in milliseconds, and the lap's time.</summary>
+/// <summary>A lap as its gates: which passages, in order, the time into the lap at each in milliseconds, and the lap's time.</summary>
 internal sealed class LapSplits
 {
     public List<string> Gates = new();
@@ -120,15 +120,20 @@ internal enum LapOutcome
 /// The delta for one course: follows the gates of the lap being flown, measures it against
 /// the best lap, and learns from each lap flown cleanly through every gate.
 ///
-/// The game says which lap each checkpoint was passed on and what its lap timer read there,
-/// so a gate's split is the game's own. Between gates the bar still moves: once the lap's
-/// clock runs past the time the best lap reached the next gate, the pilot is behind by at
-/// least that much.
+/// The game says which lap each checkpoint was passed on, and when, on the run's clock:
+/// it starts at the line after a spawn and runs on through every lap, so lap 2's gates read
+/// 25.9 s and up. Each lap's gates are taken from where that lap started, which is where the
+/// last one finished: the game reports the finish as a passage of its own at the lap's time,
+/// and the lap's time from the game settles it. The clock going back to zero, or the start
+/// line on the lap under way, is the run starting again, after a reset whether or not its
+/// respawn has been heard of yet.
 ///
-/// The start and finish line can arrive as checkpoints of their own. One at a lap timer of
-/// zero only says when the lap began, and one at the lap's time only says when it ended, so
-/// neither is kept as a split: laps from the grid and laps flown on through the line then
-/// list the same gates.
+/// Between gates the bar still moves: once the lap's clock runs past the time the best lap
+/// reached the next gate, the pilot is behind by at least that much.
+///
+/// The start and finish passages aren't kept as splits: one at the start of a lap only says
+/// when it began, and one at its time only says when it ended. Laps from the grid and laps
+/// flown on through the line then list the same gates.
 /// </summary>
 internal sealed class DeltaRun
 {
@@ -137,7 +142,7 @@ internal sealed class DeltaRun
     /// <summary>A sector count that gives every stretch between gates a sector of its own, however many the course has.</summary>
     public const int EveryGate = int.MaxValue;
 
-    /// <summary>A checkpoint this close to the lap timer's zero is the start line.</summary>
+    /// <summary>A checkpoint this soon into a lap is the start line: the game reports it about 20 ms after the last lap's finish.</summary>
     private const int StartLineMs = 50;
     /// <summary>A checkpoint this close to the lap's time is the finish line.</summary>
     private const int FinishLineMs = 20;
@@ -153,10 +158,20 @@ internal sealed class DeltaRun
     // A lap whose gates are done and whose time hasn't reached us yet.
     private Lap? _closing;
     private int? _closedIndex;
-    // When the lap timer read zero, on the caller's clock.
+    // When the lap under way started, on the caller's clock.
     private float? _startedAt;
     private DeltaView? _finished;
     private float _finishedUntil;
+
+    // The run's clock: where the lap under way started on it, whether that's known, where the
+    // lap just timed ended on it, and the last checkpoint's lap number and time. The start
+    // passage's id, once seen, marks the start of every lap.
+    private int _base;
+    private bool _clocked;
+    private int? _pendingBase;
+    private int? _lastIndex;
+    private int _lastRaw;
+    private string? _startId;
 
     public DeltaRun(CourseSplits course)
     {
@@ -175,8 +190,15 @@ internal sealed class DeltaRun
         public readonly List<string> Gates = new();
         public readonly List<int> Times = new();
 
+        /// <summary>Where the lap started on the run's clock, and whether that's known.</summary>
+        public int Base;
+        public bool Clocked;
+
         /// <summary>Seen from its start, so its gates are all of them.</summary>
         public bool Whole;
+
+        /// <summary>Begun by the start line itself, rather than by a respawn or the last lap's time.</summary>
+        public bool FromLine;
 
         /// <summary>Reset part way.</summary>
         public bool Broken;
@@ -187,27 +209,67 @@ internal sealed class DeltaRun
 
     // ── What the game says ──────────────────────────────────────────────────
 
-    /// <summary>The pilot passed a checkpoint: its passage id, the game's lap number, the lap timer there, and when it reached us.</summary>
-    public void Gate(string id, int index, float lapSeconds, float at)
+    /// <summary>The pilot passed a checkpoint: its passage id, the game's lap number, the run's clock there, and when it reached us.</summary>
+    public void Gate(string id, int index, float runSeconds, float at)
     {
+        var raw = ToMs(runSeconds);
+
         // The finish line of the lap just timed, reported after its time.
-        if (index == _closedIndex && _lap.Index == null)
+        if (index == _closedIndex && _lap.Index == null && _pendingBase is { } end && Math.Abs(raw - end) <= StartLineMs)
             return;
+
+        if (_lastIndex is { } last && (index < last || (index == last && raw + StartLineMs < _lastRaw)))
+        {
+            // The run started again, and its clock with it.
+            _base = 0;
+            _clocked = true;
+            _pendingBase = null;
+            _closing = null;
+            _closedIndex = null;
+            _lap = new Lap { Whole = true };
+        }
+        else if (_lastIndex is { } previous && index > previous)
+        {
+            // On to the next lap: it started where the last one finished.
+            _base = _pendingBase ?? _lastRaw;
+            _clocked = index == previous + 1;
+            _pendingBase = null;
+        }
+        else if (_lastIndex == null && raw < StartLineMs)
+        {
+            // The first checkpoint heard is a run's start.
+            _base = 0;
+            _clocked = true;
+        }
+        _lastIndex = index;
+        _lastRaw = raw;
 
         if (_lap.Index != null && index != _lap.Index)
         {
-            // Onto the next lap before its time has reached us; a lap number that went back is a run restarted.
-            var onward = index > _lap.Index;
-            if (onward && _lap.Gates.Count > 0)
+            // Onto the next lap before its time has reached us.
+            if (_lap.Gates.Count > 0)
                 _closing = _lap;
-            _lap = new Lap { Whole = onward && !_lap.Broken };
+            _lap = new Lap { Whole = !_lap.Broken };
         }
         _lap.Index = index;
-        _startedAt = at - lapSeconds;
+        _lap.Base = _base;
+        _lap.Clocked = _clocked;
 
-        var ms = ToMs(lapSeconds);
-        if (_lap.Gates.Count == 0 && ms < StartLineMs)
-            return; // the start line: it only says when the lap began
+        var ms = raw - _base;
+        _startedAt = _clocked ? at - ms / 1000f : null;
+
+        if (ms < StartLineMs && index == 0 && raw < StartLineMs)
+            _startId = id;
+        if (ms < StartLineMs || id == _startId)
+        {
+            // The start line: the lap begins here, so it's seen from its start. One already
+            // under way was given up: the run started again.
+            if (_lap.Gates.Count > 0 || _lap.Broken)
+                _lap = new Lap { Index = index, Base = _base, Clocked = _clocked };
+            _lap.Whole = true;
+            _lap.FromLine = true;
+            return;
+        }
         // The same passage twice running is one passage reported twice.
         if (_lap.Gates.Count > 0 && _lap.Gates[_lap.Gates.Count - 1] == id)
             return;
@@ -216,7 +278,7 @@ internal sealed class DeltaRun
         _lap.Times.Add(ms);
         var k = _lap.Gates.Count - 1;
         _lap.OnLayout &= k < _course.Gates.Count && _course.Gates[k] == id;
-        if (_lap.Whole && !_lap.Broken && _lap.OnLayout)
+        if (_lap.Whole && _lap.Clocked && !_lap.Broken && _lap.OnLayout)
             LearnStretch(_lap.Times, k, null);
     }
 
@@ -226,9 +288,25 @@ internal sealed class DeltaRun
         var lap = _closing ?? _lap;
         if (lap == _lap)
         {
-            // The next lap starts now. When its gates came first, they already said when it started.
+            // The next lap starts now, where this one ends on the run's clock.
             _lap = new Lap { Whole = true };
             _startedAt = at;
+            _pendingBase = lap.Clocked ? lap.Base + lapMs : null;
+        }
+        else if (lap.Clocked && _lap.Clocked)
+        {
+            // The lap under way took its start from the last checkpoint of this one; the lap's
+            // time says exactly where it was.
+            var shift = _lap.Base - (lap.Base + lapMs);
+            if (shift != 0)
+            {
+                for (var i = 0; i < _lap.Times.Count; i++)
+                    _lap.Times[i] += shift;
+                _lap.Base -= shift;
+                _base = _lap.Base;
+                if (_startedAt != null)
+                    _startedAt -= shift / 1000f;
+            }
         }
         _closing = null;
         _closedIndex = lap.Index;
@@ -248,24 +326,37 @@ internal sealed class DeltaRun
         return outcome;
     }
 
-    /// <summary>The drone was reset part way through a lap.</summary>
+    /// <summary>
+    /// The lap under way was given up. A lap that hasn't started isn't touched: the game
+    /// reports a reset just after the respawn that has already started the lap again.
+    /// </summary>
     public void Reset()
     {
+        if (_lap.Gates.Count == 0 && _startedAt == null)
+            return;
         _lap.Broken = true;
         _closing = null;
         _startedAt = null;
     }
 
-    /// <summary>The drone is at the start: the next lap is flown from the line.</summary>
+    /// <summary>The drone is at the start: the next lap is flown from the line, on a run clock back at zero.</summary>
     public void Spawn()
     {
+        // The start line got here first: the respawn that led to it is old news.
+        if (_lap.FromLine && _lap.Gates.Count == 0 && !_lap.Broken)
+            return;
         _lap = new Lap { Whole = true };
         _closing = null;
         _closedIndex = null;
         _startedAt = null;
+        _base = 0;
+        _clocked = true;
+        _pendingBase = null;
+        _lastIndex = null;
+        _lastRaw = 0;
     }
 
-    /// <summary>A new race: nothing is known about the lap until the drone is at the start.</summary>
+    /// <summary>A new race: nothing is known about the lap, or the run's clock, until the drone is at the start.</summary>
     public void NewRace()
     {
         _lap = new Lap { Whole = false };
@@ -273,6 +364,11 @@ internal sealed class DeltaRun
         _closedIndex = null;
         _startedAt = null;
         _finished = null;
+        _base = 0;
+        _clocked = false;
+        _pendingBase = null;
+        _lastIndex = null;
+        _lastRaw = 0;
     }
 
     /// <summary>Drops everything learned about the course: its gates, its best lap and its best stretches.</summary>
@@ -310,7 +406,7 @@ internal sealed class DeltaRun
         view.Running = true;
         var elapsed = ToMs(now - started);
         view.ElapsedMs = elapsed;
-        if (reference == null || !_lap.OnLayout)
+        if (reference == null || !_lap.OnLayout || !_lap.Clocked)
             return view;
 
         var k = _lap.Gates.Count - 1;
@@ -350,7 +446,7 @@ internal sealed class DeltaRun
             DeltaMs = reference != null ? lapMs - reference.LapMs : null,
             NewBest = outcome == LapOutcome.NewBest || (tonight && outcome == LapOutcome.BestTonight),
         };
-        if (reference != null && lap.OnLayout && lap.Gates.Count == reference.Gates.Count)
+        if (reference != null && lap.Clocked && lap.OnLayout && lap.Gates.Count == reference.Gates.Count)
             view.Sectors = Sectors(lap.Times, lapMs, reference, sectorCount);
         return view;
     }
@@ -388,7 +484,7 @@ internal sealed class DeltaRun
 
     private LapOutcome Learn(Lap lap, int lapMs)
     {
-        if (!lap.Whole || lap.Broken)
+        if (!lap.Whole || !lap.Clocked || lap.Broken)
             return LapOutcome.Timed;
 
         if (_course.Best == null && _course.Gates.Count == 0)
@@ -515,7 +611,7 @@ internal sealed class DeltaRun
         return ends;
     }
 
-    /// <summary>The lap timer at gate <paramref name="index"/>: zero before the first, the lap's time at the line.</summary>
+    /// <summary>The time into the lap at gate <paramref name="index"/>: zero before the first, the lap's time at the line.</summary>
     private static int At(List<int> times, int index, int lapMs, int gates) =>
         index < 0 ? 0 : index >= gates ? lapMs : times[index];
 

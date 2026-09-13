@@ -117,8 +117,9 @@ When a lap ends, its time and final delta stay up for three seconds, marked **NE
 is one.
 
 **How it's measured.** The game marks off each race checkpoint your drone passes, in order,
-with its lap timer there. The plugin reads those from the game's own checkpoint tracking and
-compares them with the same gates on your best lap. Between
+and when. The plugin reads those from the game's own checkpoint tracking and compares them with
+the same gates on your best lap. Every lap is measured, the first after a reset included:
+crossing the start line always starts a fresh one. Between
 gates the bar still moves: once your lap has run past the time your best lap reached the next
 gate, you're behind by at least that much.
 

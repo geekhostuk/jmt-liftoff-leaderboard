@@ -213,6 +213,8 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
         var lastSpawn = _spawnAt;
         var lastLap = _lastLapAt;
         _spawnAt = now;
+        // The new run's first checkpoint can be the very one the last run started with.
+        _lastGate = null;
         Spawned?.Invoke();
 
         if (lastSpawn != null && now - lastSpawn.Value < RespawnDebounce)

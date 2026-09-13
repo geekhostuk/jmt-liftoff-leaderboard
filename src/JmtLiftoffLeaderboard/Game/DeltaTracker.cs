@@ -29,18 +29,17 @@ internal sealed class DeltaTracker
         _settings = settings;
         run.Gate += gate =>
         {
-            _run?.Gate(gate.Id, gate.Lap, gate.LapSeconds, gate.At);
+            _run?.Gate(gate.Id, gate.Lap, gate.RunSeconds, gate.At);
             Changed?.Invoke();
         };
         run.Lap += OnLap;
+        // A respawn gives up the lap under way and starts the next from the line. The reset
+        // the game reports just after it isn't passed on: it would land on the fresh lap. A
+        // run started again without a respawn shows in the gates: the start line, or a lap
+        // number going back.
         run.Spawned += () =>
         {
             _run?.Spawn();
-            Changed?.Invoke();
-        };
-        run.Reset += _ =>
-        {
-            _run?.Reset();
             Changed?.Invoke();
         };
         run.RaceStarted += () =>

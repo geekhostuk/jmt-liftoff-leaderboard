@@ -4,14 +4,14 @@ using System.Reflection;
 
 namespace JmtLiftoffLeaderboard.Game;
 
-/// <summary>A gate the game has checked off for the local pilot: which passage, on which lap, and the lap timer there.</summary>
+/// <summary>A gate the game has checked off for the local pilot: which passage, on which lap, and when on the run's clock.</summary>
 internal readonly struct GateInfo
 {
-    public GateInfo(string id, int lap, float lapSeconds, float at)
+    public GateInfo(string id, int lap, float runSeconds, float at)
     {
         Id = id;
         Lap = lap;
-        LapSeconds = lapSeconds;
+        RunSeconds = runSeconds;
         At = at;
     }
 
@@ -20,8 +20,11 @@ internal readonly struct GateInfo
 
     public int Lap { get; }
 
-    /// <summary>The game's lap timer when the gate was passed.</summary>
-    public float LapSeconds { get; }
+    /// <summary>
+    /// When it was passed on the run's clock, which starts at the line after a spawn and runs
+    /// on through every lap: not the time into the lap.
+    /// </summary>
+    public float RunSeconds { get; }
 
     /// <summary>When it reached this client, as <c>Time.realtimeSinceStartup</c>.</summary>
     public float At { get; }

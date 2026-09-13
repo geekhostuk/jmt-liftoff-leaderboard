@@ -45,7 +45,9 @@ internal static class SplitStore
                 if (course != null && course.Version == CourseSplits.CurrentVersion)
                 {
                     course.Name = name;
-                    return course;
+                    if (Sound(course))
+                        return course;
+                    Plugin.Log.LogWarning($"HUD: your splits for {name} don't add up, so it starts again.");
                 }
             }
         }
@@ -76,6 +78,29 @@ internal static class SplitStore
     }
 
     private static string PathFor(string key) => Path.Combine(Folder, key + ".json");
+
+    /// <summary>
+    /// Whether a saved best lap is one: a time at every gate, each later than the last and all
+    /// inside the lap. Plugin builds before 0.3.0 was released could save a lap's gates on the
+    /// run's clock rather than the lap's, and a lap like that would put every lap after it
+    /// seconds ahead.
+    /// </summary>
+    private static bool Sound(CourseSplits course)
+    {
+        var best = course.Best;
+        if (best == null)
+            return course.Gates.Count == 0;
+        if (best.LapMs <= 0 || best.Gates.Count != best.Times.Count || best.Gates.Count != course.Gates.Count)
+            return false;
+        var previous = 0;
+        foreach (var ms in best.Times)
+        {
+            if (ms <= previous || ms >= best.LapMs)
+                return false;
+            previous = ms;
+        }
+        return true;
+    }
 
     private static string Slug(string text)
     {
