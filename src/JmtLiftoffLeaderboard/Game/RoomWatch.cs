@@ -43,6 +43,9 @@ internal sealed class RoomWatch
 
     public Counting Counting { get; private set; } = Counting.NotCounted;
 
+    /// <summary>The site's id for the panel reporting this room, for its timing screen; null when none does.</summary>
+    public string? PanelId { get; private set; }
+
     /// <summary>Whether counting changed, or who's in the room.</summary>
     public event Action? Changed;
 
@@ -61,6 +64,7 @@ internal sealed class RoomWatch
             _room = room;
             _next = 0;
             _pilots.Clear();
+            PanelId = null;
             Set(room == null ? Counting.NotCounted : Counting.Unknown);
         }
         if (room == null || now < _next)
@@ -76,6 +80,7 @@ internal sealed class RoomWatch
             var panel = panels.FirstOrDefault(p => p.InRoom && p.RoomName == room)
                         ?? panels.FirstOrDefault(p => string.IsNullOrEmpty(p.RoomName) && me != null && p.Pilots.Any(pilot => pilot.PublicId == me));
             _pilots.Clear();
+            PanelId = string.IsNullOrEmpty(panel?.PublicId) ? null : panel!.PublicId;
             if (panel != null)
             {
                 foreach (var pilot in panel.Pilots)

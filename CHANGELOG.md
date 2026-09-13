@@ -4,6 +4,41 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows
 [Semantic Versioning](https://semver.org/) — see [docs/versioning.md](docs/versioning.md).
 
+## [0.3.0] — 2026-09-13
+
+### Added
+
+- **Your delta against your best lap, live while you fly.** A panel at the top of the
+  screen shows how far ahead or behind the lap you're flying is, from the game's own
+  checkpoint times.
+  - A bar that fills green left of centre when you're ahead and red right of it when you're
+    behind, and whether the last stretch gained or lost time.
+  - The lap's sectors: purple for your best ever, green for quicker than the lap you're
+    measured against, yellow for slower. A line under them has the lap so far, the lap to
+    beat, and your best possible lap from your best stretches between gates.
+  - Your best lap on each course is kept on this computer, in
+    `BepInEx/config/JmtLiftoffLeaderboard/splits/`, so it's there next time. Only clean laps
+    through every gate count, and a course whose gates change is learned again after two
+    clean laps through the new ones.
+  - Ctrl+F8 sets what it's measured against (your best ever or tonight), the bar, sectors
+    (3 to 6, or off), the lap line and the bar's range, and can forget a course's best.
+- **The race in your room.** A panel with everyone's best lap this race, ranked the way the
+  room's timing screen ranks it, with the gap to the quickest or each pilot's last lap.
+  - Every lap shows the moment it's flown, in any room.
+  - In a JMT room it adds the site's side: laps from before you joined, pilots who have left,
+    and failed attempts. "UP TO P2" flashes up when you take a place.
+  - Ctrl+F8 sets how many pilots it shows, its last column and the failed column.
+- **Panels can sit in the middle of the top or bottom edge.** Drop one near the middle in
+  Ctrl+F8 and it stays centred at any resolution.
+- For the first few laps of each race the log shows each checkpoint and lap as it arrives
+  (`HUD: gate`, `HUD: lap`), to check the game is sending them.
+- Needs the JMT site's `/api/timing/live/{id}` for the race panel's JMT side, which the site
+  already has.
+
+### Changed
+
+- The Ctrl+F8 toolbar's tabs are shorter, to fit four panels: CR, Board, Delta and Race.
+
 ## [0.2.0] — 2026-09-12
 
 ### Added

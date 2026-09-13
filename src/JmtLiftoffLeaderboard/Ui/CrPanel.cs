@@ -38,7 +38,7 @@ internal sealed class CrPanel : HudPanel
     private string? _news;
     private Color _newsColor;
 
-    public CrPanel(HudPanelSettings settings, CrTracker cr) : base("Consistency", settings)
+    public CrPanel(HudPanelSettings settings, CrTracker cr) : base("CR", settings)
     {
         _cr = cr;
         cr.Changed += MarkDirty;

@@ -43,6 +43,11 @@ internal static class Theme
     private static readonly Color Violet300 = Hex(0xc4b5fd);
     private static readonly Color Violet400 = Hex(0xa78bfa);
 
+    /// <summary>A pilot's best ever sector, in motorsport's colour for it. After Violet400, which it is.</summary>
+    public static readonly Color Purple = Violet400;
+    /// <summary>A sector slower than the lap it's measured against: motorsport's yellow.</summary>
+    public static readonly Color Slower = Gold;
+
     // Corner radii, in reference pixels: cards, buttons and inputs, badges.
     public const int RadiusCard = 12;
     public const int RadiusControl = 8;

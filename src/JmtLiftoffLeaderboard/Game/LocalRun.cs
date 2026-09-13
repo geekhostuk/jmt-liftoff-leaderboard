@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine.SceneManagement;
@@ -10,14 +9,17 @@ namespace JmtLiftoffLeaderboard.Game;
 
 /// <summary>
 /// The local pilot's laps and resets, seen the way JmtLiftoffMod sees every pilot's in a
-/// JMT room, so the HUD counts them as the room does.
+/// JMT room, so the HUD counts them as the room does; and the race checkpoints they pass,
+/// for the delta bar.
 ///
 /// Liftoff publishes each pilot's run on their Photon player as the custom property
 /// <c>GMS</c>: an object whose <c>float[]</c> holds the laps of the current run, in
 /// seconds. It grows by one as each lap ends, and the game republishes it with no lap list
-/// the moment it respawns the drone. Photon calls <c>OnPlayerPropertiesUpdate</c> for the
-/// local player's own properties as well as everyone else's, so this needs nothing from
-/// the room. GMS's type and members are obfuscated, so the lap list is found by its type.
+/// the moment it respawns the drone. It also carries the last checkpoint passed, which the
+/// game has already checked is the right one in the right order. Photon calls
+/// <c>OnPlayerPropertiesUpdate</c> for the local player's own properties as well as
+/// everyone else's, so this needs nothing from the room. <see cref="GmsReader"/> finds
+/// both inside GMS's obfuscated type.
 ///
 /// The rules are the mod's (JmtLiftoffMod.cs: <c>OnGmsRespawn</c> and
 /// <c>MergeGmsLapSeries</c>), and must stay the same: a respawn within a second of the
@@ -29,10 +31,10 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
 {
     private const string TrackKey = "T";
     private static readonly TimeSpan RespawnDebounce = TimeSpan.FromSeconds(1);
-    // The mod ignores a lap list longer than its lap cap. A pilot's own run can be long.
-    private const int MaxLapsInRun = 1000;
+    // How many gates a race logs, to check in the log that they arrive. Temporary.
+    private const int GatesLogged = 60;
 
-    private readonly Dictionary<Type, List<Func<object, object?>>> _members = new();
+    private readonly GmsReader _gms = new();
     private bool _seen;
     private bool _warned;
 
@@ -44,6 +46,11 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
     private int? _raceState;
     private bool _complete;
     private string? _track;
+
+    // The last checkpoint GMS carried: GMS is republished for more than gates, and a
+    // respawn can carry the one before it.
+    private (string Id, int Lap, float Seconds)? _lastGate;
+    private int _gatesLogged;
 
     /// <summary>A lap finished, with its time in milliseconds.</summary>
     public event Action<int>? Lap;
@@ -60,7 +67,13 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
     /// <summary>A new race: a room joined or left, another track, or the race restarted.</summary>
     public event Action? RaceStarted;
 
+    /// <summary>The pilot passed a race checkpoint. Raised after the lap it may have finished.</summary>
+    public event Action<GateInfo>? Gate;
+
     public bool Installed { get; private set; }
+
+    /// <summary>Reads GMS for anyone else who follows the room, so its members are only looked up once.</summary>
+    public GmsReader Reader => _gms;
 
     /// <summary>Starts listening. Called once the main menu is up, when the game has set Photon up itself.</summary>
     public void Install()
@@ -129,7 +142,7 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
 
     private void Read(PhotonHashtable props)
     {
-        var hasRaceState = TryInt(props, "RS", out var raceState);
+        var hasRaceState = PhotonProps.TryInt(props, "RS", out var raceState);
         if (hasRaceState && _raceState >= 5 && raceState <= 3)
             NewRace(); // the race was restarted
 
@@ -140,11 +153,12 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
                 _seen = true;
                 Plugin.Log.LogInfo("HUD: reading your laps and resets from the game.");
             }
-            var laps = LapList(gms, out var hasList);
+            var laps = _gms.LapList(gms, out var hasList);
             if (laps != null)
                 Merge(laps);
             else if (!hasList)
                 Respawned();
+            ReadGate(gms, respawned: laps == null && !hasList);
         }
 
         if (hasRaceState)
@@ -175,7 +189,11 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
         _run = incoming;
         _lastLapAt = DateTime.UtcNow;
         for (var i = run.Count; i < incoming.Count; i++)
+        {
+            if (_gatesLogged < GatesLogged)
+                Plugin.Log.LogInfo($"HUD: lap {i + 1} {incoming[i]} ms");
             Lap?.Invoke(incoming[i]);
+        }
     }
 
     private void Respawned()
@@ -199,6 +217,27 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
         Reset?.Invoke(attemptMs);
     }
 
+    /// <summary>
+    /// A checkpoint GMS hasn't carried before. The lap timer's value tells one pass of a
+    /// gate from the next, so passing the same gate on the same lap after a reset is new.
+    /// What a respawn carries is the gate before it, and is only remembered.
+    /// </summary>
+    private void ReadGate(object gms, bool respawned)
+    {
+        if (_gms.Checkpoint(gms) is not { } gate || _lastGate == gate)
+            return;
+        _lastGate = gate;
+        if (respawned)
+            return;
+        if (_gatesLogged < GatesLogged)
+        {
+            _gatesLogged++;
+            Plugin.Log.LogInfo($"HUD: gate id={gate.Id} lap={gate.Lap} t={gate.Seconds:0.000}");
+        }
+        // The HUD's clock, which it draws the bar by.
+        Gate?.Invoke(new GateInfo(gate.Id, gate.Lap, gate.Seconds, UnityEngine.Time.realtimeSinceStartup));
+    }
+
     private void NewRace()
     {
         _run = null;
@@ -206,88 +245,12 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
         _lastLapAt = null;
         _raceState = null;
         _complete = false;
+        _gatesLogged = 0;
         RaceStarted?.Invoke();
     }
 
-    // ── Reading GMS ─────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// The laps of the current run, in milliseconds, or null when GMS carries none. A list
-    /// the mod would refuse (empty, or a time under a second or over ten minutes) is no
-    /// laps, but it still counts as a list: only a GMS with no lap list at all is a respawn.
-    /// </summary>
-    private List<int>? LapList(object gms, out bool hasList)
-    {
-        float[]? best = null;
-        var sawList = false;
-        Visit(gms, 0);
-        hasList = sawList;
-        if (best == null)
-            return null;
-        var laps = new List<int>(best.Length);
-        foreach (var seconds in best)
-            laps.Add((int)Math.Round(seconds * 1000d));
-        return laps;
-
-        void Visit(object? value, int depth)
-        {
-            if (value is float[] list)
-            {
-                sawList = true;
-                if (list.Length > 0 && list.Length <= MaxLapsInRun && AllLapTimes(list) && (best == null || list.Length > best.Length))
-                    best = list;
-                return;
-            }
-            if (value == null || depth >= 2 || value is string || value is Array || value is UnityEngine.Object)
-                return;
-            var type = value.GetType();
-            if (type.IsPrimitive || type.IsEnum)
-                return;
-            foreach (var read in Members(type))
-            {
-                object? child;
-                try
-                {
-                    child = read(value);
-                }
-                catch
-                {
-                    continue;
-                }
-                Visit(child, depth + 1);
-            }
-        }
-    }
-
-    private static bool AllLapTimes(float[] list)
-    {
-        foreach (var seconds in list)
-        {
-            if (seconds <= 1f || seconds > 600f)
-                return false;
-        }
-        return true;
-    }
-
-    /// <summary>A type's public fields and readable properties, as the mod's logging walks them.</summary>
-    private List<Func<object, object?>> Members(Type type)
-    {
-        if (_members.TryGetValue(type, out var known))
-            return known;
-        var members = new List<Func<object, object?>>();
-        foreach (var field in type.GetFields(BindingFlags.Instance | BindingFlags.Public))
-            members.Add(target => field.GetValue(target));
-        foreach (var property in type.GetProperties(BindingFlags.Instance | BindingFlags.Public))
-        {
-            if (property.CanRead && property.GetIndexParameters().Length == 0)
-                members.Add(target => property.GetValue(target, null));
-        }
-        _members[type] = members;
-        return members;
-    }
-
     /// <summary>Whether <paramref name="list"/> starts with <paramref name="prefix"/>, as the mod's IsPrefix.</summary>
-    private static bool IsPrefix(IReadOnlyList<int> list, IReadOnlyList<int> prefix)
+    internal static bool IsPrefix(IReadOnlyList<int> list, IReadOnlyList<int> prefix)
     {
         if (prefix.Count > list.Count)
             return false;
@@ -297,22 +260,6 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
                 return false;
         }
         return true;
-    }
-
-    private static bool TryInt(PhotonHashtable props, string key, out int value)
-    {
-        value = 0;
-        if (!props.TryGetValue(key, out var raw) || raw == null)
-            return false;
-        switch (raw)
-        {
-            case int i: value = i; return true;
-            case byte b: value = b; return true;
-            case short s: value = s; return true;
-            case long l: value = (int)l; return true;
-            case Enum e: value = Convert.ToInt32(e); return true;
-            default: return false;
-        }
     }
 
     /// <summary>
@@ -331,6 +278,26 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
                 return;
             _warned = true;
             Plugin.Log.LogWarning($"HUD: couldn't follow your run: {ex}");
+        }
+    }
+}
+
+/// <summary>Reading the game's Photon custom properties, whose integers arrive as whatever width the game sent.</summary>
+internal static class PhotonProps
+{
+    public static bool TryInt(PhotonHashtable props, string key, out int value)
+    {
+        value = 0;
+        if (!props.TryGetValue(key, out var raw) || raw == null)
+            return false;
+        switch (raw)
+        {
+            case int i: value = i; return true;
+            case byte b: value = b; return true;
+            case short s: value = s; return true;
+            case long l: value = (int)l; return true;
+            case Enum e: value = Convert.ToInt32(e); return true;
+            default: return false;
         }
     }
 }

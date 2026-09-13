@@ -5,7 +5,7 @@
        It flows into the assembly metadata AND into JmtLiftoffLeaderboard.BuildInfo,
        which the BepInPlugin attribute reads. -->
   <PropertyGroup>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
   </PropertyGroup>
 
   <!-- Build provenance. Overridden by the release script (-p:BuildRevision=<sha>) so a

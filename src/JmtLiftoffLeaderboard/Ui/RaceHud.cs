@@ -13,21 +13,24 @@ using static JmtLiftoffLeaderboard.Ui.HudText;
 namespace JmtLiftoffLeaderboard.Ui;
 
 /// <summary>
-/// The HUD shown while flying: its panels, the Consistency Rating and the course's board
-/// around the pilot, on a canvas of their own under the JMT window.
+/// The HUD shown while flying: its panels, the Consistency Rating, the course's board
+/// around the pilot, the delta against their best lap and the race in the room, on a
+/// canvas of their own under the JMT window.
 ///
 /// It keeps them off the screen while any of the game's in-flight menus is open, and each
 /// shows at the start and after each reset for as long as the pilot chose. In edit mode
 /// (EditKey, from the air or the pause menu) the panels take the mouse: click one to edit
 /// it, drag it, scroll over it to resize it, and the toolbar beside it sets its size,
 /// opacity, how long it stays up and anything of its own. Where a panel is left is kept as
-/// a corner and an offset from it, so it stays put when the resolution changes. Out of
-/// edit mode nothing on the HUD takes a click.
+/// a corner, or the middle of the top or bottom edge, and an offset from it, so it stays
+/// put when the resolution changes. Out of edit mode nothing on the HUD takes a click.
 /// </summary>
 internal sealed class RaceHud
 {
     private const float ScaleStep = 0.1f;
     private const float OpacityStep = 0.1f;
+    // A panel dropped with its middle this close to the screen's is kept centred.
+    private const float CentreSnap = 60f;
     private static readonly string[] StayLabels = { "Off", "5s", "10s", "20s", "30s", "Always" };
 
     /// <summary>
@@ -58,6 +61,8 @@ internal sealed class RaceHud
     private readonly RoomWatch _room;
     private readonly CrTracker _cr;
     private readonly BoardTracker _board;
+    private readonly DeltaTracker _delta;
+    private readonly RaceTracker _race;
     private readonly List<HudPanel> _panels;
 
     private GameObject? _root;
@@ -89,7 +94,8 @@ internal sealed class RaceHud
     private bool _cursorWasVisible;
     private CursorLockMode _cursorWasLocked;
 
-    public RaceHud(Plugin plugin, Settings settings, Overlay overlay, LocalRun run, RoomWatch room, CrTracker cr, BoardTracker board)
+    public RaceHud(Plugin plugin, Settings settings, Overlay overlay, LocalRun run, RoomWatch room, CrTracker cr, BoardTracker board,
+        DeltaTracker delta, RaceTracker race)
     {
         _plugin = plugin;
         _settings = settings;
@@ -97,10 +103,14 @@ internal sealed class RaceHud
         _room = room;
         _cr = cr;
         _board = board;
+        _delta = delta;
+        _race = race;
         _panels = new List<HudPanel>
         {
             new CrPanel(settings.Consistency, cr),
             new BoardPanel(settings, board, room),
+            new DeltaPanel(settings, delta),
+            new RacePanel(settings, race, board, room),
         };
         _selected = _panels[0];
 
@@ -110,10 +120,10 @@ internal sealed class RaceHud
                 panel.ShowAtStart();
         };
         foreach (var panel in _panels)
+        {
             panel.Settings.Changed += () => _toolbarDirty = true;
-        settings.BoardAbove.SettingChanged += (_, _) => _toolbarDirty = true;
-        settings.BoardBelow.SettingChanged += (_, _) => _toolbarDirty = true;
-        settings.BoardRuler.SettingChanged += (_, _) => _toolbarDirty = true;
+            panel.OptionsChanged += () => _toolbarDirty = true;
+        }
         SceneManager.sceneLoaded += (_, mode) =>
         {
             if (mode != LoadSceneMode.Single)
@@ -133,6 +143,8 @@ internal sealed class RaceHud
         _room.Tick(now);
         _cr.Tick(_inFlight);
         _board.Tick(_inFlight);
+        _delta.Tick(_inFlight);
+        _race.Tick(_inFlight);
 
         if (_editing && (!_inFlight || _overlay.Visible))
             SetEditing(false);
@@ -284,7 +296,10 @@ internal sealed class RaceHud
         panel.Card.anchoredPosition += drag.delta / Mathf.Max(0.01f, _canvas.scaleFactor);
     }
 
-    /// <summary>Kept as the nearest corner and the distance in from it, so it stays on screen at any resolution.</summary>
+    /// <summary>
+    /// Kept as the nearest corner and the distance in from it, so it stays on screen at any
+    /// resolution; or, dropped near the middle, centred on the top or bottom edge.
+    /// </summary>
     public void Drop(HudPanel panel)
     {
         if (!_editing || _dragging != panel)
@@ -294,15 +309,19 @@ internal sealed class RaceHud
         var (min, max) = Bounds(panel.Card, root);
         var size = root.rect.size;
         var half = size / 2;
-        var left = (min.x + max.x) / 2 < 0;
+        var middle = (min.x + max.x) / 2;
+        var centre = Mathf.Abs(middle) <= CentreSnap;
+        var left = middle < 0;
         var bottom = (min.y + max.y) / 2 < 0;
         var offsetX = Mathf.Clamp(left ? min.x + half.x : half.x - max.x, 0, Mathf.Max(0, size.x - (max.x - min.x)));
         var offsetY = Mathf.Clamp(bottom ? min.y + half.y : half.y - max.y, 0, Mathf.Max(0, size.y - (max.y - min.y)));
         var settings = panel.Settings;
-        settings.Corner.Value = left
-            ? bottom ? HudCorner.BottomLeft : HudCorner.TopLeft
-            : bottom ? HudCorner.BottomRight : HudCorner.TopRight;
-        settings.OffsetX.Value = Mathf.Round(offsetX);
+        settings.Corner.Value = centre
+            ? bottom ? HudCorner.BottomCenter : HudCorner.TopCenter
+            : left
+                ? bottom ? HudCorner.BottomLeft : HudCorner.TopLeft
+                : bottom ? HudCorner.BottomRight : HudCorner.TopRight;
+        settings.OffsetX.Value = centre ? 0 : Mathf.Round(offsetX);
         settings.OffsetY.Value = Mathf.Round(offsetY);
         panel.MarkDirty();
     }

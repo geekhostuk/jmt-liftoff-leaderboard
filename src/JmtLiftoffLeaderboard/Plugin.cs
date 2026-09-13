@@ -12,7 +12,8 @@ namespace JmtLiftoffLeaderboard;
 
 /// <summary>
 /// JMT Liftoff Leaderboard: the JMT boards and pilot profiles, inside Liftoff's menus, and
-/// the pilot's Consistency Rating and the course's board on screen while they fly.
+/// on screen while the pilot flies: their Consistency Rating, the course's board, their
+/// delta against their best lap, and the race in the room.
 ///
 /// Standalone: it reads the JMT site's public endpoints directly and needs neither
 /// JmtLiftoffMod nor Liftoff Control, though it runs happily beside both.
@@ -45,19 +46,28 @@ public sealed class Plugin : BaseUnityPlugin
         _overlay = new Overlay(this, site, me);
         new MenuHooks(this, settings, _overlay).Install(new Harmony(PluginGuid));
 
-        // Photon is the game's to set up, so the run is followed from the main menu on.
+        // Photon is the game's to set up, so the room is followed from the main menu on.
         var run = new LocalRun();
+        var laps = new RoomLaps(run.Reader);
+        void Install()
+        {
+            run.Install();
+            laps.Install();
+        }
         SceneManager.sceneLoaded += (scene, _) =>
         {
             if (scene.name == MenuHooks.MainMenuScene)
-                run.Install();
+                Install();
         };
         if (SceneManager.GetActiveScene().name == MenuHooks.MainMenuScene)
-            run.Install();
+            Install();
         var room = new RoomWatch(site, me, run);
+        var board = new BoardTracker(site, me, room, run, settings);
         _hud = new RaceHud(this, settings, _overlay, run, room,
             new CrTracker(site, me, run, room),
-            new BoardTracker(site, me, room, run, settings));
+            board,
+            new DeltaTracker(run, settings),
+            new RaceTracker(site, me, room, laps));
 
         Logger.LogInfo($"{PluginName} {BuildMarker} loaded; reading {settings.BaseUrl}");
     }
@@ -73,7 +83,7 @@ public sealed class Plugin : BaseUnityPlugin
         {
             // A HUD that throws every frame would flood the log and cost frames mid-flight.
             _hud = null;
-            Logger.LogError($"The Consistency Rating HUD failed and is off until the game restarts: {ex}");
+            Logger.LogError($"The flying HUD failed and is off until the game restarts: {ex}");
         }
     }
 }

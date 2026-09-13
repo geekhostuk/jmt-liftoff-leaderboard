@@ -107,6 +107,10 @@ internal sealed class SiteClient
     public void Live(Action<Result<List<LivePanel>>> done) =>
         Get("/api/timing/live", done, fresh: true);
 
+    /// <summary>One room's timing screen, for the race panel. Always asked afresh. 404 once the room's panel is gone.</summary>
+    public void LiveRoom(string panelId, Action<Result<LiveBoard>> done) =>
+        Get($"/api/timing/live/{Uri.EscapeDataString(panelId)}", done, fresh: true);
+
     /// <summary>Drop every kept answer, for a Refresh button.</summary>
     public void Forget() => _answers.Clear();
 

@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using BepInEx.Configuration;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -37,10 +38,16 @@ internal abstract class HudPanel
     public HudPanelSettings Settings { get; }
     public RectTransform Card { get; private set; } = null!;
 
+    /// <summary>One of the panel's own settings changed, so the edit toolbar repaints them.</summary>
+    public event Action? OptionsChanged;
+
     protected virtual float Width => 380;
 
     /// <summary>Whether it has anything to show outside edit mode.</summary>
     protected virtual bool HasContent => true;
+
+    /// <summary>In edit mode: a panel with nothing to show yet draws an example, so it can be placed and sized.</summary>
+    protected bool Editing { get; private set; }
 
     /// <summary>Until when something worth seeing keeps it up whatever its timer says: a license earned, a new best.</summary>
     protected float NewsUntil { get; private set; }
@@ -83,6 +90,13 @@ internal abstract class HudPanel
 
     public void MarkDirty() => _dirty = true;
 
+    /// <summary>One of the panel's own settings: redraw it, and the toolbar's row for it, when it changes, however it changed.</summary>
+    protected void Watch<T>(ConfigEntry<T> entry) => entry.SettingChanged += (_, _) =>
+    {
+        MarkDirty();
+        OptionsChanged?.Invoke();
+    };
+
     public void Show(float seconds) => _shownUntil = Mathf.Max(_shownUntil, Time.realtimeSinceStartup + seconds);
 
     /// <summary>The drone is at the start: up for as long as the pilot asked.</summary>
@@ -100,6 +114,7 @@ internal abstract class HudPanel
     /// </summary>
     public void Tick(float now, bool allowed, bool editing, bool pinned, bool dragging, bool selected)
     {
+        Editing = editing;
         var mode = Settings.Show.Value;
         var wanted = editing
                      || (allowed && mode != HudMode.Off && HasContent
@@ -135,12 +150,13 @@ internal abstract class HudPanel
         if (dragging)
             return;
         var corner = Settings.Corner.Value;
-        var x = corner is HudCorner.TopLeft or HudCorner.BottomLeft ? 0f : 1f;
-        var y = corner is HudCorner.BottomLeft or HudCorner.BottomRight ? 0f : 1f;
+        var centre = corner is HudCorner.TopCenter or HudCorner.BottomCenter;
+        var x = centre ? 0.5f : corner is HudCorner.TopLeft or HudCorner.BottomLeft ? 0f : 1f;
+        var y = corner is HudCorner.BottomLeft or HudCorner.BottomRight or HudCorner.BottomCenter ? 0f : 1f;
         var offsetX = Mathf.Max(0, Settings.OffsetX.Value);
         var offsetY = Mathf.Max(0, Settings.OffsetY.Value);
         Card.anchorMin = Card.anchorMax = Card.pivot = new Vector2(x, y);
-        Card.anchoredPosition = new Vector2(x == 0 ? offsetX : -offsetX, y == 0 ? offsetY : -offsetY);
+        Card.anchoredPosition = new Vector2(centre ? 0f : x == 0 ? offsetX : -offsetX, y == 0 ? offsetY : -offsetY);
         Card.sizeDelta = new Vector2(Width, Card.sizeDelta.y);
     }
 }

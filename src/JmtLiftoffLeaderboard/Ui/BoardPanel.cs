@@ -43,7 +43,7 @@ internal sealed class BoardPanel : HudPanel
     private Action<int>? _paintBelow;
     private Action<int>? _paintRuler;
 
-    public BoardPanel(Settings settings, BoardTracker board, RoomWatch room) : base("Track board", settings.Board)
+    public BoardPanel(Settings settings, BoardTracker board, RoomWatch room) : base("Board", settings.Board)
     {
         _settings = settings;
         _board = board;
@@ -51,9 +51,9 @@ internal sealed class BoardPanel : HudPanel
         board.Changed += MarkDirty;
         board.News += OnNews;
         room.Changed += MarkDirty;
-        settings.BoardAbove.SettingChanged += (_, _) => MarkDirty();
-        settings.BoardBelow.SettingChanged += (_, _) => MarkDirty();
-        settings.BoardRuler.SettingChanged += (_, _) => MarkDirty();
+        Watch(settings.BoardAbove);
+        Watch(settings.BoardBelow);
+        Watch(settings.BoardRuler);
     }
 
     protected override float Width => 400;

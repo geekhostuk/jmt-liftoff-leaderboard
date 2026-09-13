@@ -3,7 +3,8 @@
 A [BepInEx](https://github.com/BepInEx/BepInEx) plugin for
 [Liftoff](https://store.steampowered.com/app/410340/) that puts the
 [JMT FPV](https://test.geekhost.uk) leaderboards and pilot profiles inside the game's menus,
-and your Consistency Rating on screen while you fly.
+and your Consistency Rating, your delta against your best lap and the race in your room on
+screen while you fly.
 
 - **Leaderboard, in the main menu, opens the JMT board.** It's laid out like a track page on
   the JMT site: the course, its stats, the podium, the board with Top 10 / 25 / All and a
@@ -15,6 +16,9 @@ and your Consistency Rating on screen while you fly.
 - **Your Consistency Rating while you fly.** See [below](#consistency-rating-while-you-fly).
 - **The course's board around your place while you fly**, with the time to beat for the
   next place. See [below](#track-board-while-you-fly).
+- **Your delta against your best lap while you fly**, with sectors. See
+  [below](#delta-bar-while-you-fly).
+- **The race in your room while you fly.** See [below](#the-race-in-your-room).
 - **Liftoff's own leaderboard is one click away.** The "Liftoff leaderboard" button at the top
   opens the game's screen exactly as before, with its ghosts and replays.
 
@@ -92,14 +96,69 @@ with P7 as the next target, marked `*` until the site has the lap (a few seconds
 never, in practice). A new best flashes up: "NEW PB 41.402 · UP 2 PLACES TO P7". If you've never
 flown the course in a JMT room, it shows the bottom of the board, since any lap puts you on it.
 
+## Delta bar while you fly
+
+A panel at the top of the screen measures the lap you're flying against your best lap on the
+course:
+
+- **The running delta:** -0.234 in green when you're ahead, +0.120 in red when you're behind,
+  and whether the last stretch gained or lost time.
+- **A bar** that fills left of centre when you're ahead and right of it when you're behind. A
+  second either way fills it; it can be half a second or two in edit mode.
+- **The lap's sectors**, 4 by default: purple for the quickest you've ever flown it, green for
+  quicker than the lap you're measured against, yellow for slower.
+- **The lap line:** the lap so far, the lap to beat, and your best possible lap, which is your
+  quickest stretch between each pair of gates added up.
+
+When a lap ends, its time and final delta stay up for three seconds, marked **NEW BEST** when it
+is one.
+
+**How it's measured.** The game marks off each race checkpoint you pass, in order, with its lap
+timer there, and the plugin compares those times with the same gates on your best lap. Between
+gates the bar still moves: once your lap has run past the time your best lap reached the next
+gate, you're behind by at least that much.
+
+**Your best lap is kept on this computer.** The first lap you fly cleanly through every gate on
+a course becomes the one to beat, and every quicker one replaces it. It works in any room, JMT
+or not. A lap that misses a gate, is joined part way, or ends in a reset doesn't count. If a
+course's gates change, the bar learns the new ones after two clean laps through them. The laps
+are kept in `BepInEx/config/JmtLiftoffLeaderboard/splits/`, one file per course, so they're there
+next time. In edit mode you can measure against your best tonight instead, and **Forget this
+course's best** starts a course again.
+
+It's on screen all the time by default. Like every panel, it can show only at the start and
+after a reset instead, or be switched off.
+
+## The race in your room
+
+Another panel shows the race being flown in the room you're in, ranked the way the room's
+timing screen ranks it: by each pilot's best lap this race.
+
+- **Place, name, laps and best lap**, with the gap to the quickest lap of the race or each
+  pilot's last lap. The quickest lap is purple and your row is highlighted.
+- **Every lap the moment it's flown**, in any room: the game shares each pilot's laps with
+  everyone in the room.
+- **In a JMT room, the site's side too** (it shows **LIVE**): laps flown before you joined,
+  pilots who have since left (dimmed), and each pilot's failed attempts this race. The site hears
+  about laps a few seconds after the room does, so when a new race starts its rows come back
+  once it has the new race.
+- **"UP TO P2"** flashes up when you take a place, and "DOWN TO P3" when you lose one.
+
+To put the site's rows beside the pilots in a JMT room, the plugin looks up the id each pilot's
+game signed in with, the way it looks you up, once per pilot. It only does this in JMT rooms,
+where those pilots' laps already go to the site.
+
 ## Moving and setting up the panels
 
 Press **Ctrl+F8** while flying, or with the pause menu open, which is easiest. The panels take
 the mouse: click one to edit it, drag it anywhere, and scroll over it to make it bigger or
-smaller. The toolbar beside it has its size and opacity, how long it stays on screen (Off, 5,
-10, 20 or 30 seconds, or Always), and for the track board how many places to show above and
-below yours and whether to draw the ruler. **Reset this panel** puts it back as it came. Press
-**Done** or Ctrl+F8 to finish. It's all saved, and each panel keeps its place at any resolution.
+smaller. Drop a panel near the middle of the screen and it stays centred on the top or bottom
+edge. The toolbar beside it has its size and opacity, how long it stays on screen (Off, 5, 10,
+20 or 30 seconds, or Always), and the panel's own settings: for the track board, how many places
+to show above and below yours and whether to draw the ruler; for the delta bar, what it's
+measured against, its parts, sectors and range; for the race, how many pilots, the last column
+and failed attempts. **Reset this panel** puts it back as it came. Press **Done** or Ctrl+F8 to
+finish. It's all saved, and each panel keeps its place at any resolution.
 
 ## Settings
 
@@ -115,15 +174,23 @@ below yours and whether to draw the ruler. **Reset this panel** puts it back as 
 | `Menu` | `ShowProfileButton` | `true` | Add JMT Profile to the main menu. |
 | `Hud` | `PinKey` | `F8` | Keeps the panels on screen until pressed again. |
 | `Hud` | `EditKey` | `Ctrl+F8` | Move, resize and set up the panels with the mouse. |
-| `Hud`, `HudBoard` | `Show` | `BetweenAttempts` | The Consistency Rating (`Hud`) or track board (`HudBoard`) while flying: `BetweenAttempts`, `Always` or `Off`. |
-| `Hud`, `HudBoard` | `ShowSeconds` | `10` | With `BetweenAttempts`, how long it stays up: `5`, `10`, `20` or `30`. |
-| `Hud`, `HudBoard` | `Corner` | `TopRight`, `TopLeft` | The corner it keeps to. Set by dragging it. |
-| `Hud`, `HudBoard` | `OffsetX`, `OffsetY` | `24` | How far in from that corner, in pixels at 1080p. Set by dragging it. |
-| `Hud`, `HudBoard` | `Scale` | `0.8` | Its size, from `0.4` to `1.6`. |
-| `Hud`, `HudBoard` | `Opacity` | `0.9` | How solid it's drawn, from `0.2` to `1`. |
+| `Hud`, `HudBoard`, `HudDelta`, `HudRace` | `Show` | `BetweenAttempts`; `Always` for `HudDelta` | The Consistency Rating (`Hud`), track board (`HudBoard`), delta bar (`HudDelta`) or race (`HudRace`) while flying: `BetweenAttempts`, `Always` or `Off`. |
+| `Hud`, `HudBoard`, `HudDelta`, `HudRace` | `ShowSeconds` | `10` | With `BetweenAttempts`, how long it stays up: `5`, `10`, `20` or `30`. |
+| `Hud`, `HudBoard`, `HudDelta`, `HudRace` | `Corner` | `TopRight`, `TopLeft`, `TopCenter`, `BottomLeft` | Where it keeps to: a corner, or `TopCenter` / `BottomCenter`. Set by dragging it. |
+| `Hud`, `HudBoard`, `HudDelta`, `HudRace` | `OffsetX`, `OffsetY` | `24` (`HudDelta`: `0`, `24`) | How far in from that corner, in pixels at 1080p. Set by dragging it. |
+| `Hud`, `HudBoard`, `HudDelta`, `HudRace` | `Scale` | `0.8` | Its size, from `0.4` to `1.6`. |
+| `Hud`, `HudBoard`, `HudDelta`, `HudRace` | `Opacity` | `0.9` | How solid it's drawn, from `0.2` to `1`. |
 | `HudBoard` | `Above` | `3` | Places shown above yours, `1` to `5`. |
 | `HudBoard` | `Below` | `0` | Places shown below yours, `0` to `2`. |
 | `HudBoard` | `Ruler` | `true` | Draw the time ruler. |
+| `HudDelta` | `Compare` | `BestEver` | What the lap is measured against: `BestEver`, kept on this computer, or `Tonight`. |
+| `HudDelta` | `Bar` | `true` | Draw the delta bar. |
+| `HudDelta` | `Sectors` | `4` | Sectors to split a lap into: `3`, `4`, `5` or `6`, or `0` to hide them. |
+| `HudDelta` | `LapLine` | `true` | The lap so far, the lap to beat and your best possible lap. |
+| `HudDelta` | `Range` | `1` | Seconds ahead or behind that fill the bar: `0.5`, `1` or `2`. |
+| `HudRace` | `Rows` | `8` | Most pilots shown: `5`, `8` or `12`. With more in the race, the top places and yours. |
+| `HudRace` | `Column` | `Gap` | The last column: `Gap` to the quickest lap of the race, or each pilot's `Last` lap. |
+| `HudRace` | `Failed` | `true` | Failed attempts this race, in JMT rooms. |
 
 ## Other plugins
 
@@ -138,6 +205,17 @@ below yours and whether to draw the ruler. **Reset this panel** puts it back as 
 The screens use the JMT site's colours, cards and layout. If you have the site's fonts
 (Rajdhani, Inter, JetBrains Mono) installed, they're used; otherwise headings use the game's own
 menu font and times use your system's monospace font.
+
+## When something's wrong
+
+The plugin writes what it's doing to `BepInEx/LogOutput.log`, on lines starting `HUD:` for
+the panels you fly with.
+
+- **The delta bar never gets a lap to beat.** For the first few laps of each race the log shows
+  each checkpoint as it arrives (`HUD: gate id=… lap=… t=…`) and each lap (`HUD: lap …`). With
+  no `HUD: gate` lines, the game isn't sending checkpoints for that course or mode.
+- **The race panel has no LIVE.** The log says whether the room reports to the JMT site
+  (`HUD: this room reports to the JMT site`).
 
 ## Building
 

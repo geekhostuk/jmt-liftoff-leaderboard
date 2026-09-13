@@ -197,9 +197,43 @@ public sealed class PilotConsistency
 /// <summary>A room being flown right now, as the site's live page lists it.</summary>
 public sealed class LivePanel
 {
+    /// <summary>The panel's address on the site, for its timing screen.</summary>
+    [JsonProperty("public_id")] public string PublicId = "";
     [JsonProperty("in_room")] public bool InRoom;
     [JsonProperty("room_name")] public string RoomName = "";
     [JsonProperty("pilots")] public List<PilotRef> Pilots = new();
+}
+
+/// <summary>One pilot on a room's timing screen, for the race being flown now.</summary>
+public sealed class TimingRow
+{
+    /// <summary>Null for a pilot in the room who hasn't finished a lap this race.</summary>
+    [JsonProperty("position")] public int? Position;
+    [JsonProperty("pilot")] public PilotRef Pilot = new();
+    [JsonProperty("laps")] public int Laps;
+    [JsonProperty("last_lap_ms")] public int? LastLapMs;
+    [JsonProperty("best_lap_ms")] public int? BestLapMs;
+    [JsonProperty("gap_ms")] public int? GapMs;
+    [JsonProperty("in_room")] public bool InRoom = true;
+    [JsonProperty("resets")] public int Resets;
+    [JsonProperty("failed_attempts")] public int FailedAttempts;
+    [JsonProperty("flying_ms")] public int FlyingMs;
+}
+
+/// <summary>A room's timing screen: the race being flown in it now, as its panel has sent it.</summary>
+public sealed class LiveBoard
+{
+    [JsonProperty("public_id")] public string PublicId = "";
+    /// <summary>Whether the panel has reported lately. A quiet room's board is its last word.</summary>
+    [JsonProperty("online")] public bool Online;
+    [JsonProperty("in_room")] public bool InRoom;
+    [JsonProperty("room_name")] public string RoomName = "";
+    [JsonProperty("track_name")] public string TrackName = "";
+    /// <summary>The race these times are from; null before its first laps reach the site.</summary>
+    [JsonProperty("race_id")] public string? RaceId;
+    [JsonProperty("fastest_lap_ms")] public int? FastestLapMs;
+    [JsonProperty("rows", ObjectCreationHandling = ObjectCreationHandling.Replace)] public List<TimingRow> Rows = new();
+    [JsonProperty("queued_laps")] public int QueuedLaps;
 }
 
 public sealed class ItemCreator
