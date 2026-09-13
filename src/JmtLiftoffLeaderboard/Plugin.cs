@@ -44,7 +44,10 @@ public sealed class Plugin : BaseUnityPlugin
         var site = new SiteClient(this, settings, Logger);
         var me = new LocalPilot(site, settings);
         _overlay = new Overlay(this, site, me);
-        new MenuHooks(this, settings, _overlay).Install(new Harmony(PluginGuid));
+        var harmony = new Harmony(PluginGuid);
+        new MenuHooks(this, settings, _overlay).Install(harmony);
+        // The local pilot's race checkpoints, for the delta bar.
+        GateHook.Install(harmony);
 
         // Photon is the game's to set up, so the room is followed from the main menu on.
         var run = new LocalRun();

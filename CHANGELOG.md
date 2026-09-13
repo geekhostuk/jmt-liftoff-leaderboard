@@ -14,14 +14,19 @@ All notable changes to this project are documented here. The format is based on
   - A bar that fills green left of centre when you're ahead and red right of it when you're
     behind, and whether the last stretch gained or lost time.
   - The lap's sectors: purple for your best ever, green for quicker than the lap you're
-    measured against, yellow for slower. A line under them has the lap so far, the lap to
-    beat, and your best possible lap from your best stretches between gates.
+    measured against, yellow for slower. By default there's one for every stretch between
+    gates, as many as the course has, drawn as a strip sized by each stretch; or 3 to 6 even
+    sectors. A line under them has the lap so far, the lap to beat, and your best possible
+    lap from your best stretches between gates.
+  - Checkpoints are read from the game's own tracking of your drone, which every race mode
+    keeps; only some modes share them with the room.
   - Your best lap on each course is kept on this computer, in
     `BepInEx/config/JmtLiftoffLeaderboard/splits/`, so it's there next time. Only clean laps
     through every gate count, and a course whose gates change is learned again after two
     clean laps through the new ones.
   - Ctrl+F8 sets what it's measured against (your best ever or tonight), the bar, sectors
-    (3 to 6, or off), the lap line and the bar's range, and can forget a course's best.
+    (one per gate, 3 to 6, or off), the lap line and the bar's range, and can forget a
+    course's best.
 - **The race in your room.** A panel with everyone's best lap this race, ranked the way the
   room's timing screen ranks it, with the gap to the quickest or each pilot's last lap.
   - Every lap shows the moment it's flown, in any room.

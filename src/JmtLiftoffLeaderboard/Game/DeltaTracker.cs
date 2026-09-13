@@ -76,7 +76,7 @@ internal sealed class DeltaTracker
             LookAtTrack(now);
     }
 
-    public DeltaView? View(float now) => _run?.View(now, Tonight, _settings.DeltaSectors.Value);
+    public DeltaView? View(float now) => _run?.View(now, Tonight, _settings.DeltaSectorCount);
 
     /// <summary>"Forget this course's best": the next clean lap is the new one to beat.</summary>
     public void Forget()
@@ -119,7 +119,7 @@ internal sealed class DeltaTracker
     {
         if (_run == null)
             return;
-        var outcome = _run.Finish(lapMs, Time.realtimeSinceStartup, Tonight, _settings.DeltaSectors.Value);
+        var outcome = _run.Finish(lapMs, Time.realtimeSinceStartup, Tonight, _settings.DeltaSectorCount);
         if (_run.Dirty)
             Save();
         if (outcome == LapOutcome.CourseLearned)

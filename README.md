@@ -105,16 +105,20 @@ course:
   and whether the last stretch gained or lost time.
 - **A bar** that fills left of centre when you're ahead and right of it when you're behind. A
   second either way fills it; it can be half a second or two in edit mode.
-- **The lap's sectors**, 4 by default: purple for the quickest you've ever flown it, green for
-  quicker than the lap you're measured against, yellow for slower.
+- **The lap's sectors:** by default one for every stretch between gates, as many as the course
+  has. They're drawn as a strip whose segments are as long as each stretch, with the last one
+  flown spelled out under it: "Gate 7 of 23 · -0.08". Or pick 3 to 6 even sectors, each a box
+  with its delta. Purple is the quickest you've ever flown it, green is quicker than the lap
+  you're measured against, yellow is slower.
 - **The lap line:** the lap so far, the lap to beat, and your best possible lap, which is your
   quickest stretch between each pair of gates added up.
 
 When a lap ends, its time and final delta stay up for three seconds, marked **NEW BEST** when it
 is one.
 
-**How it's measured.** The game marks off each race checkpoint you pass, in order, with its lap
-timer there, and the plugin compares those times with the same gates on your best lap. Between
+**How it's measured.** The game marks off each race checkpoint your drone passes, in order,
+with its lap timer there. The plugin reads those from the game's own checkpoint tracking and
+compares them with the same gates on your best lap. Between
 gates the bar still moves: once your lap has run past the time your best lap reached the next
 gate, you're behind by at least that much.
 
@@ -185,7 +189,7 @@ finish. It's all saved, and each panel keeps its place at any resolution.
 | `HudBoard` | `Ruler` | `true` | Draw the time ruler. |
 | `HudDelta` | `Compare` | `BestEver` | What the lap is measured against: `BestEver`, kept on this computer, or `Tonight`. |
 | `HudDelta` | `Bar` | `true` | Draw the delta bar. |
-| `HudDelta` | `Sectors` | `4` | Sectors to split a lap into: `3`, `4`, `5` or `6`, or `0` to hide them. |
+| `HudDelta` | `Sectors` | `Gates` | `Gates` for one per stretch between gates, however many the course has; `3` to `6` for even sectors; `Off` to hide them. |
 | `HudDelta` | `LapLine` | `true` | The lap so far, the lap to beat and your best possible lap. |
 | `HudDelta` | `Range` | `1` | Seconds ahead or behind that fill the bar: `0.5`, `1` or `2`. |
 | `HudRace` | `Rows` | `8` | Most pilots shown: `5`, `8` or `12`. With more in the race, the top places and yours. |
@@ -211,9 +215,10 @@ menu font and times use your system's monospace font.
 The plugin writes what it's doing to `BepInEx/LogOutput.log`, on lines starting `HUD:` for
 the panels you fly with.
 
-- **The delta bar never gets a lap to beat.** For the first few laps of each race the log shows
-  each checkpoint as it arrives (`HUD: gate id=… lap=… t=…`) and each lap (`HUD: lap …`). With
-  no `HUD: gate` lines, the game isn't sending checkpoints for that course or mode.
+- **The delta bar never gets a lap to beat.** At startup the log says how many of the game's
+  checkpoint trackers the plugin follows (`HUD: following your checkpoints through …`); none
+  means a game update has changed them. For the first few laps of each race it then shows each
+  checkpoint as it arrives (`HUD: gate id=… lap=… t=…`) and each lap (`HUD: lap …`).
 - **The race panel has no LIVE.** The log says whether the room reports to the JMT site
   (`HUD: this room reports to the JMT site`).
 

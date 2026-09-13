@@ -23,16 +23,18 @@ internal readonly struct GateInfo
     /// <summary>The game's lap timer when the gate was passed.</summary>
     public float LapSeconds { get; }
 
-    /// <summary>When it reached this client, as <c>Time.unscaledTime</c>.</summary>
+    /// <summary>When it reached this client, as <c>Time.realtimeSinceStartup</c>.</summary>
     public float At { get; }
 }
 
 /// <summary>
 /// Reads a pilot's <c>GMS</c>, the object Liftoff publishes on their Photon player: the laps
-/// of the current run as a <c>float[]</c> of seconds, and the last race checkpoint they
-/// passed as a <c>RacePlayerCheckpointInfo</c> (whose name and <c>ID</c>, <c>Lap</c> and
-/// <c>Time</c> survived the obfuscation). GMS's own type and members are obfuscated, so
-/// both are found by their type.
+/// of the current run as a <c>float[]</c> of seconds, and, in the race modes that publish
+/// it, the last race checkpoint they passed as a <c>RacePlayerCheckpointInfo</c> (whose
+/// name and <c>ID</c>, <c>Lap</c> and <c>Time</c> survived the obfuscation). GMS's own
+/// types and members are obfuscated, and differ from one race mode to the next, so both
+/// are found by their type. The modes that don't publish the checkpoint are covered by
+/// <see cref="GateHook"/>.
 /// </summary>
 internal sealed class GmsReader
 {
@@ -41,7 +43,6 @@ internal sealed class GmsReader
     private const string CheckpointType = "RacePlayerCheckpointInfo";
 
     private readonly Dictionary<Type, List<Func<object, object?>>> _members = new();
-    private readonly Dictionary<Type, List<Func<object, object?>>> _checkpoints = new();
     private PropertyInfo? _id;
     private PropertyInfo? _lap;
     private PropertyInfo? _time;
@@ -79,51 +80,62 @@ internal sealed class GmsReader
             if (type.IsPrimitive || type.IsEnum)
                 return;
             foreach (var read in Members(type))
-            {
-                object? child;
-                try
-                {
-                    child = read(value);
-                }
-                catch
-                {
-                    continue;
-                }
-                Visit(child, depth + 1);
-            }
+                Visit(Get(read, value), depth + 1);
         }
     }
 
     /// <summary>
-    /// The last checkpoint GMS says the pilot passed, or null when it carries none or an
-    /// empty one (a run that hasn't reached a gate yet).
+    /// The last checkpoint GMS says the pilot passed, or null when it carries none: a race
+    /// mode that doesn't publish it, or a run that hasn't reached a gate yet. Looked for as
+    /// the lap list is, in GMS's members and in the members of what they hold.
     /// </summary>
     public (string Id, int Lap, float Seconds)? Checkpoint(object gms)
     {
-        foreach (var read in Checkpoints(gms.GetType()))
+        return Find(gms, 0);
+
+        (string, int, float)? Find(object? value, int depth)
         {
-            object? info;
-            try
+            if (value == null || value is string || value is Array || value is UnityEngine.Object)
+                return null;
+            var type = value.GetType();
+            if (type.IsPrimitive || type.IsEnum)
+                return null;
+            if (type.Name == CheckpointType)
+                return Read(value);
+            if (depth >= 2)
+                return null;
+            foreach (var read in Members(type))
             {
-                info = read(gms);
+                if (Find(Get(read, value), depth + 1) is { } found)
+                    return found;
             }
-            catch
-            {
-                continue;
-            }
-            if (info == null)
-                continue;
-            var type = info.GetType();
-            _id ??= type.GetProperty("ID");
-            _lap ??= type.GetProperty("Lap");
-            _time ??= type.GetProperty("Time");
-            if (_id?.GetValue(info, null) is not string id || id.Length == 0)
-                continue;
-            var lap = _lap?.GetValue(info, null) is int l ? l : 0;
-            var seconds = _time?.GetValue(info, null) is float t ? t : 0f;
-            return (id, lap, seconds);
+            return null;
         }
-        return null;
+    }
+
+    private (string, int, float)? Read(object info)
+    {
+        var type = info.GetType();
+        _id ??= type.GetProperty("ID");
+        _lap ??= type.GetProperty("Lap");
+        _time ??= type.GetProperty("Time");
+        if (_id?.GetValue(info, null) is not string id || id.Length == 0)
+            return null;
+        var lap = _lap?.GetValue(info, null) is int l ? l : 0;
+        var seconds = _time?.GetValue(info, null) is float t ? t : 0f;
+        return (id, lap, seconds);
+    }
+
+    private static object? Get(Func<object, object?> read, object target)
+    {
+        try
+        {
+            return read(target);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static bool AllLapTimes(float[] list)
@@ -150,35 +162,6 @@ internal sealed class GmsReader
                 members.Add(target => property.GetValue(target, null));
         }
         _members[type] = members;
-        return members;
-    }
-
-    /// <summary>Every member of GMS's type, public or not, that holds a checkpoint.</summary>
-    private List<Func<object, object?>> Checkpoints(Type type)
-    {
-        if (_checkpoints.TryGetValue(type, out var known))
-            return known;
-        var members = new List<Func<object, object?>>();
-        const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-        for (var t = type; t != null && t != typeof(object); t = t.BaseType)
-        {
-            foreach (var field in t.GetFields(flags | BindingFlags.DeclaredOnly))
-            {
-                if (field.FieldType.Name == CheckpointType)
-                    members.Add(target => field.GetValue(target));
-            }
-        }
-        if (members.Count == 0)
-        {
-            foreach (var property in type.GetProperties(flags))
-            {
-                if (property.PropertyType.Name == CheckpointType && property.CanRead && property.GetIndexParameters().Length == 0)
-                    members.Add(target => property.GetValue(target, null));
-            }
-        }
-        _checkpoints[type] = members;
-        if (members.Count == 0)
-            Plugin.Log.LogWarning($"HUD: the game's run state ({type.Name}) carries no checkpoint, so the delta bar has no gates to compare.");
         return members;
     }
 }

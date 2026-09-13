@@ -15,11 +15,13 @@ namespace JmtLiftoffLeaderboard.Game;
 /// Liftoff publishes each pilot's run on their Photon player as the custom property
 /// <c>GMS</c>: an object whose <c>float[]</c> holds the laps of the current run, in
 /// seconds. It grows by one as each lap ends, and the game republishes it with no lap list
-/// the moment it respawns the drone. It also carries the last checkpoint passed, which the
-/// game has already checked is the right one in the right order. Photon calls
-/// <c>OnPlayerPropertiesUpdate</c> for the local player's own properties as well as
-/// everyone else's, so this needs nothing from the room. <see cref="GmsReader"/> finds
-/// both inside GMS's obfuscated type.
+/// the moment it respawns the drone. Photon calls <c>OnPlayerPropertiesUpdate</c> for the
+/// local player's own properties as well as everyone else's, so this needs nothing from
+/// the room. <see cref="GmsReader"/> finds the lap list inside GMS's obfuscated type.
+///
+/// Checkpoints come from the game's own tracking through <see cref="GateHook"/>, and from
+/// GMS in the race modes that publish them there; the two can report the same passage, and
+/// it's raised once.
 ///
 /// The rules are the mod's (JmtLiftoffMod.cs: <c>OnGmsRespawn</c> and
 /// <c>MergeGmsLapSeries</c>), and must stay the same: a respawn within a second of the
@@ -47,8 +49,8 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
     private bool _complete;
     private string? _track;
 
-    // The last checkpoint GMS carried: GMS is republished for more than gates, and a
-    // respawn can carry the one before it.
+    // The last checkpoint reported: GMS is republished for more than gates, a respawn can
+    // carry the one before it, and the game's tracker reports the same passage too.
     private (string Id, int Lap, float Seconds)? _lastGate;
     private int _gatesLogged;
 
@@ -67,7 +69,7 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
     /// <summary>A new race: a room joined or left, another track, or the race restarted.</summary>
     public event Action? RaceStarted;
 
-    /// <summary>The pilot passed a race checkpoint. Raised after the lap it may have finished.</summary>
+    /// <summary>The pilot passed a race checkpoint.</summary>
     public event Action<GateInfo>? Gate;
 
     public bool Installed { get; private set; }
@@ -88,6 +90,7 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
                 if (mode == LoadSceneMode.Single)
                     Safely(NewRace);
             };
+            GateHook.Passed += (id, lap, seconds) => Safely(() => Passed((id, lap, seconds), "tracker"));
             Installed = true;
         }
         catch (Exception ex)
@@ -158,7 +161,15 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
                 Merge(laps);
             else if (!hasList)
                 Respawned();
-            ReadGate(gms, respawned: laps == null && !hasList);
+
+            // What a respawn carries is the gate before it, and is only remembered.
+            if (_gms.Checkpoint(gms) is { } gate)
+            {
+                if (laps == null && !hasList)
+                    _lastGate = gate;
+                else
+                    Passed(gate, "GMS");
+            }
         }
 
         if (hasRaceState)
@@ -218,21 +229,18 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
     }
 
     /// <summary>
-    /// A checkpoint GMS hasn't carried before. The lap timer's value tells one pass of a
-    /// gate from the next, so passing the same gate on the same lap after a reset is new.
-    /// What a respawn carries is the gate before it, and is only remembered.
+    /// A checkpoint not reported before. The lap timer's value tells one pass of a gate
+    /// from the next, so passing the same gate on the same lap after a reset is new.
     /// </summary>
-    private void ReadGate(object gms, bool respawned)
+    private void Passed((string Id, int Lap, float Seconds) gate, string source)
     {
-        if (_gms.Checkpoint(gms) is not { } gate || _lastGate == gate)
+        if (_lastGate == gate)
             return;
         _lastGate = gate;
-        if (respawned)
-            return;
         if (_gatesLogged < GatesLogged)
         {
             _gatesLogged++;
-            Plugin.Log.LogInfo($"HUD: gate id={gate.Id} lap={gate.Lap} t={gate.Seconds:0.000}");
+            Plugin.Log.LogInfo($"HUD: gate id={gate.Id} lap={gate.Lap} t={gate.Seconds:0.000} ({source})");
         }
         // The HUD's clock, which it draws the bar by.
         Gate?.Invoke(new GateInfo(gate.Id, gate.Lap, gate.Seconds, UnityEngine.Time.realtimeSinceStartup));
@@ -263,8 +271,8 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
     }
 
     /// <summary>
-    /// Photon and the scene loader call every listener in a loop, and the game's own are
-    /// among them: nothing thrown here may reach either.
+    /// Photon, the scene loader and the game's checkpoint tracking call every listener in a
+    /// loop, and the game's own are among them: nothing thrown here may reach any of them.
     /// </summary>
     private void Safely(Action action)
     {

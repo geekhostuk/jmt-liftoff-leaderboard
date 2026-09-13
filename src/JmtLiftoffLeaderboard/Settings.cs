@@ -1,5 +1,6 @@
 using System;
 using BepInEx.Configuration;
+using JmtLiftoffLeaderboard.Game;
 using UnityEngine;
 
 namespace JmtLiftoffLeaderboard;
@@ -107,8 +108,8 @@ internal sealed class Settings
     /// <summary>The delta bar's range each way, in seconds: a delta this big fills the bar.</summary>
     public static readonly float[] DeltaRanges = { 0.5f, 1f, 2f };
 
-    /// <summary>How many sectors the delta bar splits a lap into; 0 hides them.</summary>
-    public static readonly int[] DeltaSectorCounts = { 0, 3, 4, 5, 6 };
+    /// <summary>How the delta bar splits a lap into sectors: a sector per stretch between gates, a fixed number, or none.</summary>
+    public static readonly string[] DeltaSectorChoices = { "Gates", "3", "4", "5", "6", "Off" };
 
     public static readonly int[] RaceRowCounts = { 5, 8, 12 };
 
@@ -134,7 +135,7 @@ internal sealed class Settings
     public HudPanelSettings Delta { get; }
     public ConfigEntry<DeltaCompare> DeltaCompare { get; }
     public ConfigEntry<bool> DeltaBar { get; }
-    public ConfigEntry<int> DeltaSectors { get; }
+    public ConfigEntry<string> DeltaSectors { get; }
     public ConfigEntry<bool> DeltaLapLine { get; }
     public ConfigEntry<float> DeltaRange { get; }
 
@@ -181,11 +182,11 @@ internal sealed class Settings
             "What the lap you're flying is measured against: BestEver is your best lap on this course, kept on this computer; Tonight is your best since the game started.");
         DeltaBar = config.Bind("HudDelta", "Bar", true,
             "A bar that fills left of centre when you're ahead and right when you're behind.");
-        DeltaSectors = config.Bind("HudDelta", "Sectors", 4,
-            new ConfigDescription("How many sectors to split the lap into, each coloured purple for your best ever, green for quicker than the lap you're measured against, yellow for slower. 0 hides them.",
-                new AcceptableValueList<int>(DeltaSectorCounts)));
+        DeltaSectors = config.Bind("HudDelta", "Sectors", "Gates",
+            new ConfigDescription("How the lap is split into sectors, each coloured purple for your best ever, green for quicker than the lap you're measured against, yellow for slower. Gates gives every stretch between gates its own, as many as the course has; 3 to 6 splits the lap evenly; Off hides them.",
+                new AcceptableValueList<string>(DeltaSectorChoices)));
         DeltaLapLine = config.Bind("HudDelta", "LapLine", true,
-            "A line under the bar: the lap time so far, the lap you're measured against, and your best possible lap from your best sectors.");
+            "A line under the bar: the lap time so far, the lap you're measured against, and your best possible lap from your best stretches.");
         DeltaRange = config.Bind("HudDelta", "Range", 1f,
             new ConfigDescription("How many seconds ahead or behind fill the bar.", new AcceptableValueList<float>(DeltaRanges)));
 
@@ -197,6 +198,14 @@ internal sealed class Settings
         RaceFailed = config.Bind("HudRace", "Failed", true,
             "In a JMT room, how many attempts each pilot has given up part way this race.");
     }
+
+    /// <summary>How many sectors the delta bar splits a lap into: <see cref="DeltaRun.EveryGate"/> for one per stretch, 0 for none.</summary>
+    public int DeltaSectorCount => DeltaSectors.Value switch
+    {
+        "Off" => 0,
+        var count when int.TryParse(count, out var n) && n > 0 => n,
+        _ => DeltaRun.EveryGate,
+    };
 
     /// <summary>The site's address with no trailing slash, ready for a path to be added.</summary>
     public string BaseUrl => (SiteUrl.Value ?? "").Trim().TrimEnd('/');

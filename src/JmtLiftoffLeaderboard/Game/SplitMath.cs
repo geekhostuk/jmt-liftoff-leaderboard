@@ -55,11 +55,12 @@ internal enum SectorMark
 
 internal readonly struct SectorView
 {
-    public SectorView(int? ms, int? deltaMs, SectorMark mark)
+    public SectorView(int? ms, int? deltaMs, SectorMark mark, int refMs)
     {
         Ms = ms;
         DeltaMs = deltaMs;
         Mark = mark;
+        RefMs = refMs;
     }
 
     public int? Ms { get; }
@@ -68,6 +69,9 @@ internal readonly struct SectorView
     public int? DeltaMs { get; }
 
     public SectorMark Mark { get; }
+
+    /// <summary>The sector on the lap it's measured against, which says how much of the lap it is.</summary>
+    public int RefMs { get; }
 }
 
 /// <summary>What the delta bar shows now.</summary>
@@ -129,6 +133,9 @@ internal enum LapOutcome
 internal sealed class DeltaRun
 {
     public static readonly int[] SectorCounts = { 3, 4, 5, 6 };
+
+    /// <summary>A sector count that gives every stretch between gates a sector of its own, however many the course has.</summary>
+    public const int EveryGate = int.MaxValue;
 
     /// <summary>A checkpoint this close to the lap timer's zero is the start line.</summary>
     private const int StartLineMs = 50;
@@ -201,6 +208,9 @@ internal sealed class DeltaRun
         var ms = ToMs(lapSeconds);
         if (_lap.Gates.Count == 0 && ms < StartLineMs)
             return; // the start line: it only says when the lap began
+        // The same passage twice running is one passage reported twice.
+        if (_lap.Gates.Count > 0 && _lap.Gates[_lap.Gates.Count - 1] == id)
+            return;
 
         _lap.Gates.Add(id);
         _lap.Times.Add(ms);
@@ -352,22 +362,24 @@ internal sealed class DeltaRun
             return sectors;
         var gates = reference.Gates.Count;
         var ends = SectorEnds(gates, count);
-        _course.Sectors.TryGetValue(count, out var bests);
+        // A sector per stretch is a stretch: its best is the stretch's.
+        List<int?>? bests = ends.Length == gates + 1 ? _course.Segments
+            : _course.Sectors.TryGetValue(count, out var kept) ? kept : null;
         for (var i = 0; i < ends.Length; i++)
         {
             var end = ends[i];
+            var from = i > 0 ? ends[i - 1] : -1;
+            var refMs = At(reference.Times, end, reference.LapMs, gates) - At(reference.Times, from, 0, gates);
             var done = end < gates ? end < times.Count : lapMs != null;
             if (!done)
             {
-                sectors.Add(new SectorView(null, null, SectorMark.Pending));
+                sectors.Add(new SectorView(null, null, SectorMark.Pending, refMs));
                 continue;
             }
-            var from = i > 0 ? ends[i - 1] : -1;
-            var ms = At(times, end, lapMs!.GetValueOrDefault(), gates) - At(times, from, 0, gates);
-            var refMs = At(reference.Times, end, reference.LapMs, gates) - At(reference.Times, from, 0, gates);
+            var ms = At(times, end, lapMs.GetValueOrDefault(), gates) - At(times, from, 0, gates);
             var best = bests != null && i < bests.Count ? bests[i] : null;
             var mark = best != null && ms <= best ? SectorMark.Best : ms < refMs ? SectorMark.Faster : SectorMark.Slower;
-            sectors.Add(new SectorView(ms, ms - refMs, mark));
+            sectors.Add(new SectorView(ms, ms - refMs, mark, refMs));
         }
         return sectors;
     }
@@ -488,7 +500,8 @@ internal sealed class DeltaRun
     /// <summary>
     /// The gate each sector ends at, splitting a lap through <paramref name="gates"/> gates
     /// into <paramref name="count"/> sectors of as equal a number of stretches as can be. The
-    /// last ends at the line, given as the gate count. Fewer sectors when there are fewer stretches.
+    /// last ends at the line, given as the gate count. Fewer sectors when there are fewer
+    /// stretches, so <see cref="EveryGate"/> gives each stretch its own.
     /// </summary>
     public static int[] SectorEnds(int gates, int count)
     {
@@ -496,7 +509,7 @@ internal sealed class DeltaRun
         var n = Math.Max(0, Math.Min(count, stretches));
         var ends = new int[n];
         for (var i = 0; i < n - 1; i++)
-            ends[i] = (int)Math.Round((i + 1) * stretches / (double)n, MidpointRounding.AwayFromZero) - 1;
+            ends[i] = (int)Math.Round((i + 1) * (double)stretches / n, MidpointRounding.AwayFromZero) - 1;
         if (n > 0)
             ends[n - 1] = gates;
         return ends;
