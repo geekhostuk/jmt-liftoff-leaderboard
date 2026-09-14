@@ -21,8 +21,8 @@ screen while you fly.
 - **The race in your room while you fly.** See [below](#the-race-in-your-room).
 - **A lap review on Ctrl+F7:** your laps gate by gate, and where they lose time. See
   [below](#lap-review).
-- **Your gate splits on the JMT site,** once you link your JMT account, and a delta bar that
-  works from your first lap on a course. See [below](#your-gate-splits-on-the-jmt-site).
+- **Your gate splits on the JMT site,** sent through the JMT room you fly in, and a delta bar
+  that works from your first lap on a course. See [below](#your-gate-splits-on-the-jmt-site).
 - **Liftoff's own leaderboard is one click away.** The "Liftoff leaderboard" button at the top
   opens the game's screen exactly as before, with its ghosts and replays.
 
@@ -171,26 +171,24 @@ until the game closes: the last 20 on each course you fly.
 ## Your gate splits on the JMT site
 
 The room's timing sends every pilot's lap times to the JMT site, but it can't see anyone's gates.
-This plugin sees yours, so once you link your JMT account it sends them too, and the site shows
-them.
+This plugin sees yours, and shares them with the room you're flying in. In a JMT room, the host's
+Liftoff Control sends them to the site along with the room's lap times, and the site shows them.
 
-**Linking.** Press **Ctrl+F8**, pick the delta bar, and press **Link** on the "JMT account" row.
-The JMT site opens in your browser with a code filled in. Sign in with Steam if you need to, check
-the code matches the one in the game, and approve it. That's all: the plugin picks up a key for
-your account by itself and keeps it in its `.cfg` on your computer. **Unlink** in the same place
-stops it, and the site's account page lists what's linked and can revoke it.
+**There's nothing to set up.** Nothing to link and no key to paste: your gate times go with the
+room's own laps, under the game id the room already knows you by. The host's game needs
+JmtLiftoffMod 1.4.0 or later to pass them on. With an older one, or in a room that doesn't report
+to the JMT site, nothing is done with them.
 
-**What it sends.** For each whole lap you fly from the line through every gate, in a room that
-reports to the JMT site: the course's gates, your time at each, the lap's time and when it was
-flown, with the game id the room knows you by. Nothing from laps flown anywhere else, and nothing
-about anyone else. The site matches the splits to the lap the room already sent, and they never
-change a lap time or a board. A lap the site can't take yet waits on your computer, in
-`BepInEx/config/JmtLiftoffLeaderboard/splits-outbox.json`, for up to a week.
+**What it shares.** For each whole lap you fly from the line through every gate: the course's
+gates (the checkpoints' ids from the course file), your time at each, and the lap's time. They go
+on your player in the room, the way the game shares your lap times, so anyone in the room could
+read them; only a JMT room's host passes them on. Nothing about anyone else. `[Splits]
+ShareWithRoom = false` stops it.
 
-**Your game id has to be yours on the site.** Linking the plugin doesn't claim it, because anyone
-in a room can see a pilot's game id. If Liftoff signs you in with a Steam id it's already yours;
-otherwise type a claim code in chat in a JMT room once (the link page gives you one), and the
-splits waiting on your computer go then.
+**They land on your laps.** The site files them with the lap the room recorded, and they never
+change a lap time or a board. If your game id isn't yours on the site yet, they wait under it
+with your laps, and become yours with them when you claim it with a claim code typed in a JMT
+room.
 
 **What the site does with them.** A board's rows open to show a pilot's best lap gate by gate,
 against the course's quickest lap or their own best stretches, and a pilot's profile lists their
@@ -200,7 +198,7 @@ possible laps: their quickest time through every stretch, added up.
 asks the site for the course's gates and times. If you have a best there with splits, it becomes
 your best here; otherwise the bar measures you against the course's quickest lap, named on the bar
 ("VS NAME"), until your first clean lap becomes your own. It never replaces a best flown on this
-computer. This needs no link: the site's times are public.
+computer. The site's times are public, so this works in any room.
 
 ## The race in your room
 
@@ -248,9 +246,7 @@ finish. It's all saved, and each panel keeps its place at any resolution.
 | `Hud` | `PinKey` | `F8` | Keeps the panels on screen until pressed again. |
 | `Hud` | `EditKey` | `Ctrl+F8` | Move, resize and set up the panels with the mouse. |
 | `Hud` | `ReviewKey` | `Ctrl+F7` | Open the lap review. |
-| `Site` | `Token` | *(filled in)* | The key "Link your JMT account" collects. Clear it, or press Unlink, to stop sending. |
-| `Site` | `LinkedAs` | *(filled in)* | The JMT account it's linked to. You don't need to edit it. |
-| `Splits` | `Upload` | `true` | Once linked, send the gate times of your own laps in JMT rooms. |
+| `Splits` | `ShareWithRoom` | `true` | Share the gate times of your own laps with the room, for a JMT room's host to send to the site. |
 | `Splits` | `FromSite` | `true` | Seed a course with no best here from the JMT site, so the delta bar works from the first lap. |
 | `Hud`, `HudBoard`, `HudDelta`, `HudRace` | `Show` | `BetweenAttempts`; `Always` for `HudDelta` | The Consistency Rating (`Hud`), track board (`HudBoard`), delta bar (`HudDelta`) or race (`HudRace`) while flying: `BetweenAttempts`, `Always` or `Off`. |
 | `Hud`, `HudBoard`, `HudDelta`, `HudRace` | `ShowSeconds` | `10` | With `BetweenAttempts`, how long it stays up: `5`, `10`, `20` or `30`. |

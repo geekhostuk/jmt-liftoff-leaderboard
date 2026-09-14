@@ -115,12 +115,8 @@ internal sealed class Settings
 
     public ConfigEntry<string> SiteUrl { get; }
 
-    /// <summary>The key "Link your JMT account" collects, and whose account it is.</summary>
-    public ConfigEntry<string> SiteToken { get; }
-    public ConfigEntry<string> SiteLinkedAs { get; }
-
-    /// <summary>Gate splits to and from the JMT site, in [Splits].</summary>
-    public ConfigEntry<bool> SplitsUpload { get; }
+    /// <summary>Gate splits to the room and from the JMT site, in [Splits].</summary>
+    public ConfigEntry<bool> SplitsShareWithRoom { get; }
     public ConfigEntry<bool> SplitsFromSite { get; }
     public ConfigEntry<string> PilotPublicId { get; }
     public ConfigEntry<string> LastGameUserId { get; }
@@ -158,13 +154,9 @@ internal sealed class Settings
     {
         SiteUrl = config.Bind("Site", "Url", "https://test.geekhost.uk",
             "The JMT site to read leaderboards and pilot profiles from.");
-        SiteToken = config.Bind("Site", "Token", "",
-            "Filled in by \"Link your JMT account\" (Ctrl+F8, the delta bar's settings): what lets this computer send the gate times of your own laps. Clear it, or press Unlink, to stop.");
-        SiteLinkedAs = config.Bind("Site", "LinkedAs", "",
-            "Filled in when you link: the JMT account the key belongs to, for the HUD to show. No need to edit it.");
 
-        SplitsUpload = config.Bind("Splits", "Upload", true,
-            "Once you've linked your JMT account, send the gate times of your own laps in JMT rooms, so the site can show your splits.");
+        SplitsShareWithRoom = config.Bind("Splits", "ShareWithRoom", true,
+            "Share the gate times of your own laps with the room you're flying in. In a JMT room, the host's Liftoff Control sends them to the JMT site with the room's lap times, so the site can show your splits.");
         SplitsFromSite = config.Bind("Splits", "FromSite", true,
             "On a course with no best lap on this computer, take its gates and times from the JMT site, so the delta bar works from the first lap.");
 

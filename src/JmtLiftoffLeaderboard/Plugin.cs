@@ -31,7 +31,6 @@ public sealed class Plugin : BaseUnityPlugin
 
     private Overlay? _overlay;
     private RaceHud? _hud;
-    private SplitUploader? _uploader;
 
     private void Awake()
     {
@@ -68,15 +67,13 @@ public sealed class Plugin : BaseUnityPlugin
         var room = new RoomWatch(site, me, run);
         var board = new BoardTracker(site, me, room, run, settings);
         var delta = new DeltaTracker(run, settings, site, board.BoardIdFor, () => me.Known);
-        // Once linked, the gate times of the pilot's own laps go to the site.
-        var link = new SiteLink(this, site, settings);
-        _uploader = new SplitUploader(site, settings, link, room, delta, new SplitOutbox());
+        // The gate times of the pilot's own laps go to the room, for a JMT room's host to send on.
+        new SplitPublisher(settings, delta);
         _hud = new RaceHud(this, settings, _overlay, run, room,
             new CrTracker(site, me, run, room),
             board,
             delta,
-            new RaceTracker(site, me, room, laps),
-            link);
+            new RaceTracker(site, me, room, laps));
 
         Logger.LogInfo($"{PluginName} {BuildMarker} loaded; reading {settings.BaseUrl}");
     }
@@ -93,15 +90,6 @@ public sealed class Plugin : BaseUnityPlugin
             // A HUD that throws every frame would flood the log and cost frames mid-flight.
             _hud = null;
             Logger.LogError($"The flying HUD failed and is off until the game restarts: {ex}");
-        }
-        try
-        {
-            _uploader?.Tick(Time.realtimeSinceStartup);
-        }
-        catch (Exception ex)
-        {
-            _uploader = null;
-            Logger.LogError($"Sending gate splits failed and is off until the game restarts: {ex}");
         }
     }
 }

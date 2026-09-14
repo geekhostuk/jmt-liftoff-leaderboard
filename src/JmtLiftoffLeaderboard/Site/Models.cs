@@ -194,66 +194,6 @@ public sealed class PilotConsistency
     [JsonProperty("model")] public CrModel Model = new();
 }
 
-/// <summary>A room being flown right now, as the site's live page lists it.</summary>
-/// <summary>A Steam account, as the JMT site names it.</summary>
-public sealed class AccountRef
-{
-    [JsonProperty("steam_id")] public string SteamId = "";
-    [JsonProperty("persona_name")] public string? PersonaName;
-    [JsonProperty("avatar_url")] public string? AvatarUrl;
-}
-
-/// <summary>A link to the JMT site started: the code to show, and the page to approve it on.</summary>
-public sealed class LinkStarted
-{
-    [JsonProperty("device_code")] public string DeviceCode = "";
-    [JsonProperty("user_code")] public string UserCode = "";
-    [JsonProperty("verification_uri")] public string VerificationUri = "";
-    [JsonProperty("verification_uri_complete")] public string VerificationUriComplete = "";
-    [JsonProperty("expires_in")] public int ExpiresIn = 600;
-    [JsonProperty("interval")] public int Interval = 3;
-}
-
-/// <summary>Whether a link has been answered, and the token when it has been approved.</summary>
-public sealed class LinkPollAnswer
-{
-    [JsonProperty("status")] public string Status = "";
-    [JsonProperty("kind")] public string Kind = "";
-    [JsonProperty("token")] public string? Token;
-    [JsonProperty("owner")] public AccountRef? Owner;
-}
-
-/// <summary>One lap's gate times, as sent to the JMT site.</summary>
-public sealed class SplitUpload
-{
-    [JsonProperty("client_ref")] public string ClientRef = "";
-    [JsonProperty("pilot_key")] public string PilotKey = "";
-    [JsonProperty("board_id")] public long? BoardId;
-    [JsonProperty("panel_id")] public string? PanelId;
-    [JsonProperty("gates")] public List<string> Gates = new();
-    [JsonProperty("times")] public List<int> Times = new();
-    [JsonProperty("lap_ms")] public int LapMs;
-    [JsonProperty("prev_lap_ms")] public int? PrevLapMs;
-    [JsonProperty("flown_at")] public DateTimeOffset FlownAt;
-}
-
-public sealed class SplitBatch
-{
-    [JsonProperty("splits")] public List<SplitUpload> Splits = new();
-}
-
-public sealed class SplitResultInfo
-{
-    [JsonProperty("client_ref")] public string ClientRef = "";
-    [JsonProperty("status")] public string Status = "";
-    [JsonProperty("attached")] public bool Attached;
-}
-
-public sealed class SplitBatchAnswer
-{
-    [JsonProperty("results")] public List<SplitResultInfo> Results = new();
-}
-
 /// <summary>A lap as the room timed it, with its time at each gate.</summary>
 public class SiteSplitLap
 {
@@ -276,7 +216,7 @@ public sealed class SitePilotSplits
     [JsonProperty("laps_with_splits")] public int LapsWithSplits;
 }
 
-/// <summary>A course's gates and the quickest times through them, from laps pilots sent splits for.</summary>
+/// <summary>A course's gates and the quickest times through them, from laps with splits.</summary>
 public sealed class SiteCourseSplits
 {
     [JsonProperty("board_id")] public long BoardId;
@@ -288,11 +228,7 @@ public sealed class SiteCourseSplits
     [JsonProperty("pilot")] public SitePilotSplits? Pilot;
 }
 
-/// <summary>Nothing: an answer whose status is all there is to it.</summary>
-public sealed class NoContent
-{
-}
-
+/// <summary>A room being flown right now, as the site's live page lists it.</summary>
 public sealed class LivePanel
 {
     /// <summary>The panel's address on the site, for its timing screen.</summary>

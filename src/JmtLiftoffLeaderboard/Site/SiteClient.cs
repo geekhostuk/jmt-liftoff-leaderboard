@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Text;
 using BepInEx.Logging;
 using Newtonsoft.Json;
 using UnityEngine;
@@ -121,27 +120,6 @@ internal sealed class SiteClient
         Get(path, done, fresh: true);
     }
 
-    // ── Linked: what this computer sends ────────────────────────────────────
-    //
-    // Only once the pilot has linked their JMT account, and only their own laps' gate
-    // times. The token lives in the pilot's own .cfg.
-
-    /// <summary>Starts "Link your JMT account": a code for the pilot to approve on the site.</summary>
-    public void LinkStart(string label, string version, string? gameUserId, Action<Result<LinkStarted>> done) =>
-        Send("POST", "/api/link/start",
-            new { kind = "plugin", label, client_version = version, game_user_id = gameUserId }, null, done);
-
-    /// <summary>Whether the link has been approved yet.</summary>
-    public void LinkPoll(string deviceCode, Action<Result<LinkPollAnswer>> done) =>
-        Send("POST", "/api/link/poll", new { device_code = deviceCode }, null, done);
-
-    /// <summary>Stops a token working, for Unlink.</summary>
-    public void RevokeToken(string token, Action<Result<NoContent>> done) =>
-        Send("POST", "/api/ingest/token/revoke", null, token, done);
-
-    public void UploadSplits(string token, SplitBatch batch, Action<Result<SplitBatchAnswer>> done) =>
-        Send("POST", "/api/ingest/splits", batch, token, done);
-
     /// <summary>Drop every kept answer, for a Refresh button.</summary>
     public void Forget() => _answers.Clear();
 
@@ -208,64 +186,6 @@ internal sealed class SiteClient
         }
 
         Deliver(done, result);
-    }
-
-    private void Send<T>(string method, string path, object? body, string? bearer, Action<Result<T>> done) where T : class =>
-        _host.StartCoroutine(SendRoutine(method, _settings.BaseUrl + path, body, bearer, done));
-
-    private IEnumerator SendRoutine<T>(string method, string url, object? body, string? bearer, Action<Result<T>> done) where T : class
-    {
-        using var request = new UnityWebRequest(url, method);
-        if (body != null)
-        {
-            request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(body)));
-            request.SetRequestHeader("Content-Type", "application/json");
-        }
-        request.downloadHandler = new DownloadHandlerBuffer();
-        request.timeout = TimeoutSeconds;
-        request.SetRequestHeader("Accept", "application/json");
-        if (!string.IsNullOrEmpty(bearer))
-            request.SetRequestHeader("Authorization", "Bearer " + bearer);
-        yield return request.SendWebRequest();
-
-        var result = new Result<T> { Status = request.responseCode };
-        var text = request.downloadHandler?.text ?? "";
-        if (request.result == UnityWebRequest.Result.Success)
-        {
-            try
-            {
-                if (text.Length > 0)
-                    result.Value = JsonConvert.DeserializeObject<T>(text, Json);
-            }
-            catch (Exception ex)
-            {
-                result.Error = "The JMT site sent something this version can't read. An update may fix it.";
-                _log.LogWarning($"Could not read {method} {url}: {ex.Message}");
-            }
-        }
-        else
-        {
-            // The site's own reason, when it gave one, is what the pilot is shown.
-            result.Error = Detail(text) ?? (request.responseCode == 0
-                ? "Can't reach the JMT site. Check your connection."
-                : $"The JMT site answered {request.responseCode}.");
-            _log.LogWarning($"{method} {url}: {request.responseCode} {request.error}");
-        }
-        Deliver(done, result);
-    }
-
-    private static string? Detail(string text)
-    {
-        try
-        {
-            return Newtonsoft.Json.Linq.JObject.Parse(text)["detail"] is { Type: Newtonsoft.Json.Linq.JTokenType.String } detail
-                ? (string?)detail
-                : null;
-        }
-        catch
-        {
-            return null;
-        }
     }
 
     private IEnumerator FetchTexture(string url)

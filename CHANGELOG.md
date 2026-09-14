@@ -4,26 +4,23 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows
 [Semantic Versioning](https://semver.org/) — see [docs/versioning.md](docs/versioning.md).
 
-## [Unreleased]
+## [0.5.0] — Unreleased
 
 ### Added
 
-- **Your gate splits on the JMT site.** Link your JMT account (Ctrl+F8, the delta bar's "JMT
-  account" row): the site opens with a code filled in, you approve it, and the plugin picks up a
-  key for your account by itself. It then sends the gate times of your own laps in JMT rooms, and
-  the site shows them on the board and your profile.
-  - Only whole laps from the line through every gate, only in rooms that report to the JMT site,
-    and never anything about anyone else. They never change a lap time or a board.
-  - Linking doesn't claim your game id; if it isn't yours on the site yet, a claim code typed in a
-    JMT room once does it. Splits wait on your computer for up to a week meanwhile.
-  - Unlink stops it and revokes the key on the site.
+- **Your gate splits on the JMT site.** The gate times of your own laps are shared with the room
+  you fly in, and in a JMT room the host's Liftoff Control sends them to the site with the room's
+  lap times. The site shows them on the board and your profile.
+  - Nothing to link or set up: they go under the game id the room already knows you by.
+  - Only whole laps from the line through every gate, and nothing about anyone else. They never
+    change a lap time or a board.
+  - The host's game needs JmtLiftoffMod 1.4.0 or later to pass them on.
 - **The delta bar works from your first lap on a course.** A course with no best lap on this
   computer takes its gates and times from the JMT site: your best there when you have one with
   splits, or else the course's quickest lap, named on the bar, until your first clean lap. It
   never replaces a best flown on this computer.
-- New settings: `[Site] Token` and `LinkedAs` (filled in by linking), `[Splits] Upload` and
-  `[Splits] FromSite`.
-- Needs the JMT site's `/api/link/*`, `/api/ingest/splits` and `/api/timing/splits/*`.
+- New settings: `[Splits] ShareWithRoom` and `[Splits] FromSite`.
+- Needs the JMT site's `/api/timing/splits/*`.
 
 ## [0.4.0] — 2026-09-13
 
