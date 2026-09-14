@@ -70,6 +70,15 @@ internal sealed class BoardTracker
     /// <summary>The course being flown, as the game names it.</summary>
     public string TrackName => _track?.Name ?? "";
 
+    /// <summary>
+    /// The board a course is on, for anything else following the same course: a Workshop
+    /// course's id straight away, a named board's once this has found it by name.
+    /// </summary>
+    public long? BoardIdFor(TrackRef track) =>
+        _track != null && _track.TrackName == track.TrackName && _track.Environments.SequenceEqual(track.Environments)
+            ? _track.BoardId
+            : track.BoardId;
+
     public event Action? Changed;
     public event Action<BoardNews>? News;
 

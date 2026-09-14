@@ -40,6 +40,12 @@ internal sealed class CourseSplits
 
     /// <summary>The best time for each sector, by how many sectors the lap is split into.</summary>
     public Dictionary<int, List<int?>> Sectors = new();
+
+    /// <summary>
+    /// "jmt" while the best lap is the pilot's best from the JMT site, flown before this
+    /// computer kept their splits; null once one flown here beats it.
+    /// </summary>
+    public string? BestSource;
 }
 
 internal enum SectorMark
@@ -102,6 +108,26 @@ internal sealed class DeltaView
     public bool Finished;
     public int? FinishedMs;
     public bool NewBest;
+
+    /// <summary>Measured against the course's quickest lap from the JMT site, the pilot having none of their own yet.</summary>
+    public bool ReferenceFromSite;
+
+    /// <summary>Whose lap that is.</summary>
+    public string? ReferenceName;
+}
+
+/// <summary>
+/// What the JMT site knows about a course, to measure the first lap against: its gates,
+/// the pilot's own best lap through them and best stretches, and the course's quickest
+/// lap, whoever flew it.
+/// </summary>
+internal sealed class CourseSeed
+{
+    public List<string> Gates = new();
+    public LapSplits? Best;
+    public List<int?> Segments = new();
+    public LapSplits? Reference;
+    public string? ReferenceName;
 }
 
 internal enum LapOutcome
@@ -157,6 +183,9 @@ internal sealed class DeltaRun
     private int _attempts;
     // A different run of gates seen on one clean lap: the course's, if the next clean lap agrees.
     private List<string>? _candidate;
+    // The course's quickest lap from the JMT site, measured against until the pilot has a best.
+    private LapSplits? _siteRef;
+    private string? _siteRefName;
 
     private Lap _lap = new() { Whole = false };
     // A lap whose gates are done and whose time hasn't reached us yet.
@@ -397,9 +426,43 @@ internal sealed class DeltaRun
         _course.Sectors.Clear();
         _tonight = null;
         _candidate = null;
+        _siteRef = null;
+        _siteRefName = null;
         _lap.OnLayout = false;
         _finished = null;
         Dirty = true;
+    }
+
+    /// <summary>
+    /// Takes what the JMT site knows about the course, for a course with no best lap here:
+    /// its gates, the pilot's best from the site if they have one, and the course's quickest
+    /// lap to measure against until then. Never touches a best flown on this computer.
+    /// Returns whether anything was taken.
+    /// </summary>
+    public bool Seed(CourseSeed seed)
+    {
+        if (_course.Best != null || seed.Gates.Count == 0)
+            return false;
+        bool Fits(LapSplits? lap) => lap != null && Same(lap.Gates, seed.Gates) && SplitRules.IsSound(lap);
+        var best = Fits(seed.Best) ? seed.Best!.Copy() : null;
+        var reference = Fits(seed.Reference) ? seed.Reference!.Copy() : null;
+        if (best == null && reference == null)
+            return false;
+
+        _course.Gates = new List<string>(seed.Gates);
+        _course.Best = best;
+        _course.BestSetAt = null;
+        _course.BestSource = best != null ? "jmt" : null;
+        _course.Segments = best != null && seed.Segments.Count == seed.Gates.Count + 1
+            ? new List<int?>(seed.Segments)
+            : new List<int?>();
+        _course.Sectors = new Dictionary<int, List<int?>>();
+        _candidate = null;
+        _siteRef = reference;
+        _siteRefName = reference != null ? seed.ReferenceName : null;
+        _lap.OnLayout = OnLayout(_lap.Gates);
+        Dirty = true;
+        return true;
     }
 
     // ── The laps for the review ─────────────────────────────────────────────
@@ -440,11 +503,14 @@ internal sealed class DeltaRun
             return _finished;
 
         var reference = Reference(tonight);
+        var fromSite = reference != null && reference == _siteRef;
         var view = new DeltaView
         {
             HasReference = reference != null,
             ReferenceMs = reference?.LapMs,
             OptimalMs = Optimal(),
+            ReferenceFromSite = fromSite,
+            ReferenceName = fromSite ? _siteRefName : null,
         };
         if (_startedAt is not { } started || _lap.Broken)
             return view;
@@ -464,7 +530,7 @@ internal sealed class DeltaRun
         return view;
     }
 
-    private LapSplits? Reference(bool tonight) => tonight ? _tonight : _course.Best;
+    private LapSplits? Reference(bool tonight) => tonight ? _tonight : _course.Best ?? _siteRef;
 
     private int? Optimal()
     {
@@ -489,6 +555,8 @@ internal sealed class DeltaRun
             HasReference = reference != null,
             ReferenceMs = reference?.LapMs,
             OptimalMs = Optimal(),
+            ReferenceFromSite = reference != null && reference == _siteRef,
+            ReferenceName = reference != null && reference == _siteRef ? _siteRefName : null,
             DeltaMs = reference != null ? lapMs - reference.LapMs : null,
             NewBest = outcome == LapOutcome.NewBest || (tonight && outcome == LapOutcome.BestTonight),
         };
@@ -549,6 +617,7 @@ internal sealed class DeltaRun
             {
                 _course.Best = Splits(lap, lapMs);
                 _course.BestSetAt = DateTimeOffset.UtcNow;
+                _course.BestSource = null;
                 Dirty = true;
                 outcome = LapOutcome.NewBest;
             }
@@ -573,6 +642,7 @@ internal sealed class DeltaRun
         _course.Gates = new List<string>(lap.Gates);
         _course.Best = Splits(lap, lapMs);
         _course.BestSetAt = DateTimeOffset.UtcNow;
+        _course.BestSource = null;
         _course.Segments = new List<int?>();
         _course.Sectors = new Dictionary<int, List<int?>>();
         _tonight = Splits(lap, lapMs);
@@ -695,4 +765,51 @@ internal sealed class DeltaRun
     }
 
     private static int ToMs(float seconds) => (int)Math.Round(seconds * 1000d);
+}
+
+/// <summary>What a lap's splits have to be to be kept, saved or sent: the JMT site's own rules.</summary>
+internal static class SplitRules
+{
+    /// <summary>More gates than any course has.</summary>
+    public const int MaxGates = 200;
+
+    /// <summary>The shortest a stretch between gates can be: anything quicker is one passage reported twice.</summary>
+    public const int MinStretchMs = 40;
+
+    private static readonly System.Text.RegularExpressions.Regex GateId = new("^[A-Za-z0-9-]{1,64}$");
+
+    /// <summary>A time at every gate, each later than the last and all inside the lap.</summary>
+    public static bool IsSound(LapSplits lap)
+    {
+        if (lap.LapMs <= 0 || lap.Gates.Count != lap.Times.Count)
+            return false;
+        var previous = 0;
+        foreach (var ms in lap.Times)
+        {
+            if (ms <= previous || ms >= lap.LapMs)
+                return false;
+            previous = ms;
+        }
+        return true;
+    }
+
+    /// <summary>Whether the site would take these splits: the plugin never sends what it would refuse.</summary>
+    public static bool ValidForUpload(IReadOnlyList<string> gates, IReadOnlyList<int> times, int lapMs)
+    {
+        if (gates.Count == 0 || gates.Count > MaxGates || times.Count != gates.Count || lapMs <= 0)
+            return false;
+        for (var i = 0; i < gates.Count; i++)
+        {
+            if (!GateId.IsMatch(gates[i]) || (i > 0 && gates[i] == gates[i - 1]))
+                return false;
+        }
+        var previous = 0;
+        foreach (var ms in times)
+        {
+            if (ms - previous < MinStretchMs)
+                return false;
+            previous = ms;
+        }
+        return lapMs - previous >= MinStretchMs;
+    }
 }

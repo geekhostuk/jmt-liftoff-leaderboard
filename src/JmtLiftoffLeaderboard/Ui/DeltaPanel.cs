@@ -25,7 +25,13 @@ internal sealed class DeltaPanel : HudPanel
 
     private readonly Settings _settings;
     private readonly DeltaTracker _delta;
+    private readonly SiteLink _link;
     private readonly Action _openReview;
+
+    private Text? _accountText;
+    private GameObject? _linkButton;
+    private GameObject? _cancelButton;
+    private GameObject? _unlinkButton;
 
     private Text _state = null!;
     private Text _trend = null!;
@@ -47,11 +53,13 @@ internal sealed class DeltaPanel : HudPanel
     private Action<int>? _paintSectors;
     private Action<int>? _paintRange;
 
-    public DeltaPanel(Settings settings, DeltaTracker delta, Action openReview) : base("Delta", settings.Delta)
+    public DeltaPanel(Settings settings, DeltaTracker delta, SiteLink link, Action openReview) : base("Delta", settings.Delta)
     {
         _settings = settings;
         _delta = delta;
+        _link = link;
         _openReview = openReview;
+        link.Changed += OptionsTouched;
         delta.Changed += MarkDirty;
         delta.News += OnNews;
         Watch(settings.DeltaCompare);
@@ -148,6 +156,16 @@ internal sealed class DeltaPanel : HudPanel
         UiKit.Spacer(review);
         UiKit.Button(review, "Review laps", () => _openReview(), UiKit.ButtonKind.Outline, 14, 30);
 
+        // Linking lets the plugin send the gate times of the pilot's own laps to the site.
+        var account = UiKit.Row(section, 8, name: "Account");
+        UiKit.OneLine(UiKit.Caption(account, "JMT account"));
+        _accountText = UiKit.OneLine(UiKit.Label(account, "", 13, Theme.Ink600));
+        UiKit.Spacer(account);
+        _linkButton = UiKit.Button(account, "Link", () => _link.Start(), UiKit.ButtonKind.Outline, 14, 30).gameObject;
+        _cancelButton = UiKit.Button(account, "Cancel", () => _link.Cancel(), UiKit.ButtonKind.Ghost, 14, 30).gameObject;
+        _unlinkButton = UiKit.Button(account, "Unlink", () => _link.Unlink(), UiKit.ButtonKind.Ghost, 14, 30).gameObject;
+        RefreshAccount();
+
         var forget = UiKit.Row(section, 8, name: "Forget");
         UiKit.OneLine(UiKit.Label(forget, "Your splits are kept for each course on this computer.", 13, Theme.Ink600));
         UiKit.Spacer(forget);
@@ -161,6 +179,22 @@ internal sealed class DeltaPanel : HudPanel
         _paintLine?.Invoke(_settings.DeltaLapLine.Value ? 0 : 1);
         _paintSectors?.Invoke(SectorsIndex());
         _paintRange?.Invoke(RangeIndex());
+        RefreshAccount();
+    }
+
+    /// <summary>The account row: linked, waiting for the code to be approved, or why not.</summary>
+    private void RefreshAccount()
+    {
+        if (_accountText == null)
+            return;
+        (_accountText.text, _accountText.color) =
+            _link.Waiting ? (_link.UserCode.Length > 0 ? $"Approve {_link.UserCode} on the JMT site" : "Asking the JMT site...", Theme.Accent)
+            : _link.Problem.Length > 0 ? (Clip(_link.Problem, 60), Theme.Alarm)
+            : _link.Linked ? ($"Linked as {Clip(_link.LinkedAs, 24)}: your gate times go to the site", Theme.Ink400)
+            : ("Link it to send your gate times to the site", Theme.Ink600);
+        _linkButton!.SetActive(!_link.Waiting && (!_link.Linked || _link.Problem.Length > 0));
+        _cancelButton!.SetActive(_link.Waiting);
+        _unlinkButton!.SetActive(_link.Linked && !_link.Waiting);
     }
 
     public override void Reset()
@@ -237,7 +271,11 @@ internal sealed class DeltaPanel : HudPanel
         }
         else
         {
-            (_state.text, _state.color) = (!view.HasReference ? "" : Tonight ? "VS TONIGHT" : "VS YOUR BEST", Theme.Ink600);
+            // Before a lap of their own, the course's quickest from the site, by whoever flew it.
+            (_state.text, _state.color) = (!view.HasReference ? ""
+                : Tonight ? "VS TONIGHT"
+                : view.ReferenceFromSite ? $"VS {Clip(view.ReferenceName ?? "JMT", 16).ToUpperInvariant()}"
+                : "VS YOUR BEST", Theme.Ink600);
         }
 
         (_trend.text, _trend.color) = view.Running && view.DeltaMs != null
@@ -333,7 +371,7 @@ internal sealed class DeltaPanel : HudPanel
         if (view.Running && view.ElapsedMs is { } elapsed)
             parts.Add($"Lap {Clock(elapsed)}");
         if (view.ReferenceMs is { } reference)
-            parts.Add($"{(Tonight ? "Tonight" : "Best")} {Lap(reference)}");
+            parts.Add($"{(Tonight ? "Tonight" : view.ReferenceFromSite ? "JMT best" : "Best")} {Lap(reference)}");
         if (view.OptimalMs is { } optimal)
             parts.Add($"Possible {Lap(optimal)}");
         return string.Join(" · ", parts);

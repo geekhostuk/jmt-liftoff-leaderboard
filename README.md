@@ -21,6 +21,8 @@ screen while you fly.
 - **The race in your room while you fly.** See [below](#the-race-in-your-room).
 - **A lap review on Ctrl+F7:** your laps gate by gate, and where they lose time. See
   [below](#lap-review).
+- **Your gate splits on the JMT site,** once you link your JMT account, and a delta bar that
+  works from your first lap on a course. See [below](#your-gate-splits-on-the-jmt-site).
 - **Liftoff's own leaderboard is one click away.** The "Liftoff leaderboard" button at the top
   opens the game's screen exactly as before, with its ghosts and replays.
 
@@ -166,6 +168,40 @@ Ctrl+F8 has a **Review laps** button too.
 Your best lap on each course is kept on this computer, but the laps in the review are kept only
 until the game closes: the last 20 on each course you fly.
 
+## Your gate splits on the JMT site
+
+The room's timing sends every pilot's lap times to the JMT site, but it can't see anyone's gates.
+This plugin sees yours, so once you link your JMT account it sends them too, and the site shows
+them.
+
+**Linking.** Press **Ctrl+F8**, pick the delta bar, and press **Link** on the "JMT account" row.
+The JMT site opens in your browser with a code filled in. Sign in with Steam if you need to, check
+the code matches the one in the game, and approve it. That's all: the plugin picks up a key for
+your account by itself and keeps it in its `.cfg` on your computer. **Unlink** in the same place
+stops it, and the site's account page lists what's linked and can revoke it.
+
+**What it sends.** For each whole lap you fly from the line through every gate, in a room that
+reports to the JMT site: the course's gates, your time at each, the lap's time and when it was
+flown, with the game id the room knows you by. Nothing from laps flown anywhere else, and nothing
+about anyone else. The site matches the splits to the lap the room already sent, and they never
+change a lap time or a board. A lap the site can't take yet waits on your computer, in
+`BepInEx/config/JmtLiftoffLeaderboard/splits-outbox.json`, for up to a week.
+
+**Your game id has to be yours on the site.** Linking the plugin doesn't claim it, because anyone
+in a room can see a pilot's game id. If Liftoff signs you in with a Steam id it's already yours;
+otherwise type a claim code in chat in a JMT room once (the link page gives you one), and the
+splits waiting on your computer go then.
+
+**What the site does with them.** A board's rows open to show a pilot's best lap gate by gate,
+against the course's quickest lap or their own best stretches, and a pilot's profile lists their
+possible laps: their quickest time through every stretch, added up.
+
+**The delta bar from the first lap.** On a course with no best lap on this computer, the delta bar
+asks the site for the course's gates and times. If you have a best there with splits, it becomes
+your best here; otherwise the bar measures you against the course's quickest lap, named on the bar
+("VS NAME"), until your first clean lap becomes your own. It never replaces a best flown on this
+computer. This needs no link: the site's times are public.
+
 ## The race in your room
 
 Another panel shows the race being flown in the room you're in, ranked the way the room's
@@ -212,6 +248,10 @@ finish. It's all saved, and each panel keeps its place at any resolution.
 | `Hud` | `PinKey` | `F8` | Keeps the panels on screen until pressed again. |
 | `Hud` | `EditKey` | `Ctrl+F8` | Move, resize and set up the panels with the mouse. |
 | `Hud` | `ReviewKey` | `Ctrl+F7` | Open the lap review. |
+| `Site` | `Token` | *(filled in)* | The key "Link your JMT account" collects. Clear it, or press Unlink, to stop sending. |
+| `Site` | `LinkedAs` | *(filled in)* | The JMT account it's linked to. You don't need to edit it. |
+| `Splits` | `Upload` | `true` | Once linked, send the gate times of your own laps in JMT rooms. |
+| `Splits` | `FromSite` | `true` | Seed a course with no best here from the JMT site, so the delta bar works from the first lap. |
 | `Hud`, `HudBoard`, `HudDelta`, `HudRace` | `Show` | `BetweenAttempts`; `Always` for `HudDelta` | The Consistency Rating (`Hud`), track board (`HudBoard`), delta bar (`HudDelta`) or race (`HudRace`) while flying: `BetweenAttempts`, `Always` or `Off`. |
 | `Hud`, `HudBoard`, `HudDelta`, `HudRace` | `ShowSeconds` | `10` | With `BetweenAttempts`, how long it stays up: `5`, `10`, `20` or `30`. |
 | `Hud`, `HudBoard`, `HudDelta`, `HudRace` | `Corner` | `TopRight`, `TopLeft`, `TopCenter`, `BottomLeft` | Where it keeps to: a corner, or `TopCenter` / `BottomCenter`. Set by dragging it. |

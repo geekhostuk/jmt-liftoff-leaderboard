@@ -46,6 +46,9 @@ internal sealed class RoomWatch
     /// <summary>The site's id for the panel reporting this room, for its timing screen; null when none does.</summary>
     public string? PanelId { get; private set; }
 
+    /// <summary>The Photon room the pilot is in, or null.</summary>
+    public string? Room => _room;
+
     /// <summary>Whether counting changed, or who's in the room.</summary>
     public event Action? Changed;
 

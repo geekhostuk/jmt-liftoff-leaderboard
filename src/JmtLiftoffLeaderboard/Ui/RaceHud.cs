@@ -99,7 +99,7 @@ internal sealed class RaceHud
     private CursorLockMode _cursorWasLocked;
 
     public RaceHud(Plugin plugin, Settings settings, Overlay overlay, LocalRun run, RoomWatch room, CrTracker cr, BoardTracker board,
-        DeltaTracker delta, RaceTracker race)
+        DeltaTracker delta, RaceTracker race, SiteLink link)
     {
         _plugin = plugin;
         _settings = settings;
@@ -113,7 +113,7 @@ internal sealed class RaceHud
         {
             new CrPanel(settings.Consistency, cr),
             new BoardPanel(settings, board, room),
-            new DeltaPanel(settings, delta, () => SetReviewing(true)),
+            new DeltaPanel(settings, delta, link, () => SetReviewing(true)),
             new RacePanel(settings, race, board, room),
         };
         _selected = _panels[0];

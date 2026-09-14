@@ -90,6 +90,13 @@ internal abstract class HudPanel
 
     public void MarkDirty() => _dirty = true;
 
+    /// <summary>Something the panel's rows in the edit toolbar show changed, other than a setting.</summary>
+    protected void OptionsTouched()
+    {
+        MarkDirty();
+        OptionsChanged?.Invoke();
+    }
+
     /// <summary>One of the panel's own settings: redraw it, and the toolbar's row for it, when it changes, however it changed.</summary>
     protected void Watch<T>(ConfigEntry<T> entry) => entry.SettingChanged += (_, _) =>
     {

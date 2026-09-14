@@ -63,13 +63,7 @@ internal static class SplitStore
     {
         try
         {
-            Directory.CreateDirectory(Folder);
-            var path = PathFor(key);
-            var temp = path + ".tmp";
-            File.WriteAllText(temp, JsonConvert.SerializeObject(course, Json), Encoding.UTF8);
-            if (File.Exists(path))
-                File.Delete(path);
-            File.Move(temp, path);
+            JsonFile.Write(PathFor(key), JsonConvert.SerializeObject(course, Json));
         }
         catch (Exception ex)
         {
@@ -88,8 +82,9 @@ internal static class SplitStore
     private static bool Sound(CourseSplits course)
     {
         var best = course.Best;
+        // Gates with no best are a course seeded from the JMT site before a lap was flown here.
         if (best == null)
-            return course.Gates.Count == 0;
+            return true;
         if (best.LapMs <= 0 || best.Gates.Count != best.Times.Count || best.Gates.Count != course.Gates.Count)
             return false;
         var previous = 0;

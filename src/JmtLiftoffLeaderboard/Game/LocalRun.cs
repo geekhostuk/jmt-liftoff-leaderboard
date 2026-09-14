@@ -74,6 +74,9 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
 
     public bool Installed { get; private set; }
 
+    /// <summary>The lap before the one <see cref="Lap"/> is raised for, in the same run; null for the run's first.</summary>
+    public int? PreviousLapMs { get; private set; }
+
     /// <summary>Reads GMS for anyone else who follows the room, so its members are only looked up once.</summary>
     public GmsReader Reader => _gms;
 
@@ -203,6 +206,7 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
         {
             if (_gatesLogged < GatesLogged)
                 Plugin.Log.LogInfo($"HUD: lap {i + 1} {incoming[i]} ms");
+            PreviousLapMs = i > 0 ? incoming[i - 1] : null;
             Lap?.Invoke(incoming[i]);
         }
     }
