@@ -46,6 +46,9 @@ internal sealed class SiteLink
 
     public string UserCode { get; private set; } = "";
 
+    /// <summary>The site's link page, to enter the code on by hand: "test.geekhost.uk/link".</summary>
+    public string Page { get; private set; } = "";
+
     /// <summary>Something the pilot should know: a turned-down link, a refused token.</summary>
     public string Problem { get; private set; } = "";
 
@@ -74,10 +77,15 @@ internal sealed class SiteLink
                 }
                 var started = result.Value!;
                 UserCode = started.UserCode;
+                // Where to go by hand, if the browser doesn't open: the address without its scheme.
+                Page = started.VerificationUri.Replace("https://", "").Replace("http://", "");
                 var page = started.VerificationUriComplete;
-                if (page.StartsWith("https://", StringComparison.Ordinal) || page.StartsWith("http://", StringComparison.Ordinal))
-                    Application.OpenURL(page);
-                Plugin.Log.LogInfo($"HUD: linking to the JMT site; approve code {UserCode} there.");
+                if (Browser.IsWebAddress(page))
+                {
+                    Browser.Copy(page);
+                    Browser.Open(page);
+                }
+                Plugin.Log.LogInfo($"HUD: linking to the JMT site: approve code {UserCode} at {page} (copied to the clipboard).");
                 Changed?.Invoke();
                 _host.StartCoroutine(Poll(attempt, started));
             });

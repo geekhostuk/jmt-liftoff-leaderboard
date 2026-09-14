@@ -188,7 +188,8 @@ internal sealed class DeltaPanel : HudPanel
         if (_accountText == null)
             return;
         (_accountText.text, _accountText.color) =
-            _link.Waiting ? (_link.UserCode.Length > 0 ? $"Approve {_link.UserCode} on the JMT site" : "Asking the JMT site...", Theme.Accent)
+            // The browser should have opened with the code in; if it didn't, this is all it takes.
+            _link.Waiting ? (_link.UserCode.Length > 0 ? $"Enter {_link.UserCode} at {_link.Page}" : "Asking the JMT site...", Theme.Accent)
             : _link.Problem.Length > 0 ? (Clip(_link.Problem, 60), Theme.Alarm)
             : _link.Linked ? ($"Linked as {Clip(_link.LinkedAs, 24)}: your gate times go to the site", Theme.Ink400)
             : ("Link it to send your gate times to the site", Theme.Ink600);
