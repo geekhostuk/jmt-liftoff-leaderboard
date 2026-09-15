@@ -31,6 +31,7 @@ public sealed class Plugin : BaseUnityPlugin
 
     private Overlay? _overlay;
     private RaceHud? _hud;
+    private LocalRun? _run;
 
     private void Awake()
     {
@@ -50,7 +51,7 @@ public sealed class Plugin : BaseUnityPlugin
         GateHook.Install(harmony);
 
         // Photon is the game's to set up, so the room is followed from the main menu on.
-        var run = new LocalRun();
+        var run = _run = new LocalRun();
         var laps = new RoomLaps(run.Reader);
         void Install()
         {
@@ -87,6 +88,7 @@ public sealed class Plugin : BaseUnityPlugin
         FrameProbe.Tick(counting: _hud?.InFlight == true);
         using var probe = FrameProbe.Measure(FrameProbe.Part.Frame);
         _overlay?.Tick();
+        _run?.Tick();
         try
         {
             _hud?.Tick();

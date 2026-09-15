@@ -37,6 +37,10 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
     private const int GatesLogged = 60;
 
     private readonly GmsReader _gms = new();
+    private readonly StartWatch _start = new();
+
+    /// <summary>Called every frame: follows the drone off the start after a respawn.</summary>
+    public void Tick() => _start.Poll();
     private bool _seen;
     private bool _warned;
 
@@ -61,7 +65,7 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
     /// The drone was reset part way through the run: how long the abandoned attempt had
     /// run, in milliseconds, or null for a reset only noticed at the next lap.
     /// </summary>
-    public event Action<int?>? Reset;
+    public event Action<Attempt?>? Reset;
 
     /// <summary>The drone is at the start: arriving, or reset.</summary>
     public event Action? Spawned;
@@ -214,6 +218,7 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
     private void Respawned()
     {
         var now = DateTime.UtcNow;
+        var began = _start.Respawned();
         var lastSpawn = _spawnAt;
         var lastLap = _lastLapAt;
         _spawnAt = now;
@@ -228,10 +233,16 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
         if (_complete)
             return;
 
+        // As the room's host times it: from the lap flown on from, else from when the drone
+        // left the start (never leaving is no attempt), else from the respawn.
         var fromLap = lastLap != null && (lastSpawn == null || lastLap.Value > lastSpawn.Value);
-        var attemptMs = (int)(now - (fromLap ? lastLap!.Value : lastSpawn!.Value)).TotalMilliseconds;
+        var attempt = fromLap
+            ? new Attempt((int)(now - lastLap!.Value).TotalMilliseconds, "lap")
+            : began is { } seen
+                ? new Attempt(seen.LeftAt is { } left ? (int)(now - left).TotalMilliseconds : 0, "start")
+                : new Attempt((int)(now - lastSpawn!.Value).TotalMilliseconds, "respawn");
         _run = null;
-        Reset?.Invoke(attemptMs);
+        Reset?.Invoke(attempt);
     }
 
     /// <summary>
@@ -255,6 +266,7 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
     private void NewRace()
     {
         _run = null;
+        _start.Forget();
         _spawnAt = null;
         _lastLapAt = null;
         _raceState = null;

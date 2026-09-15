@@ -160,12 +160,18 @@ internal sealed class CrTracker
         }
     }
 
-    private void OnReset(int? attemptMs)
+    private void OnReset(Attempt? attempt)
     {
-        var failed = attemptMs is { } ms && ms >= Model.TooShortMs && ms <= Model.IdleMs;
-        Plugin.Log.LogInfo(attemptMs == null
+        // The site's rule: an attempt timed from the respawn includes the wait at the start,
+        // so it has longer before it counts.
+        var failed = attempt is { } a
+                     && a.Ms >= (a.From == "respawn" ? Model.RespawnTooShortMs : Model.TooShortMs)
+                     && a.Ms <= Model.IdleMs;
+        Plugin.Log.LogInfo(attempt is not { } seen
             ? "HUD: a reset noticed late, with no time for the attempt; not a failed attempt."
-            : $"HUD: reset {attemptMs.Value / 1000.0:0.0}s into the attempt; {(failed ? "a failed attempt" : "not a failed attempt")}.");
+            : seen.From == "start" && seen.Ms == 0
+                ? "HUD: reset before leaving the start; not a failed attempt."
+                : $"HUD: reset {seen.Ms / 1000.0:0.0}s after {(seen.From == "lap" ? "your last lap" : seen.From == "start" ? "leaving the start" : "the respawn")}; {(failed ? "a failed attempt" : "not a failed attempt")}.");
         if (!failed)
             return;
 

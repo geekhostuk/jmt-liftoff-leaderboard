@@ -173,6 +173,22 @@ public sealed class CrModel
     [JsonProperty("too_short_ms")] public int TooShortMs = 5_000;
     /// <summary>...and no longer than this.</summary>
     [JsonProperty("idle_ms")] public int IdleMs = 120_000;
+
+    /// <summary>
+    /// The floor instead for an attempt timed from the respawn, which counts the wait at the
+    /// start. A site from before it had one floor for every attempt.
+    /// </summary>
+    [JsonProperty("respawn_too_short_ms")] public int RespawnTooShortMs = 5_000;
+
+    /// <summary>
+    /// What a failed attempt weighs, rising with the CR itself: min + (cr - from) · per, held
+    /// between min and max. A site from before it weighed every one the same, which is what
+    /// these defaults give.
+    /// </summary>
+    [JsonProperty("crash_weight_min")] public double CrashWeightMin = 1.0;
+    [JsonProperty("crash_weight_max")] public double CrashWeightMax = 1.0;
+    [JsonProperty("crash_weight_from_cr")] public double CrashWeightFromCr;
+    [JsonProperty("crash_weight_per_cr")] public double CrashWeightPerCr;
 }
 
 /// <summary>One race inside a pilot's CR window.</summary>

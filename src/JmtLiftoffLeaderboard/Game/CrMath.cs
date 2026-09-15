@@ -77,13 +77,40 @@ internal static class CrMath
     private const int LookAhead = 1000;
     private const int DropLookAhead = 3;
 
-    /// <summary>CR = max · m / (m + fpl), failed attempts per lap taken with the prior laps flown at the midpoint.</summary>
+    /// <summary>
+    /// CR = max · m / (m + fpl), failed attempts per lap taken with the prior laps flown at the
+    /// midpoint, each failed attempt weighed by <see cref="Weight"/> at the CR it gives. That
+    /// weight rises with the CR, so the CR is where the two meet, found by bisection exactly as
+    /// the site finds it (sixty halvings, the same arithmetic in the same order), so the two
+    /// round alike.
+    /// </summary>
     public static double Rating(CrModel m, int failed, int laps)
     {
         var seen = laps + m.PriorLaps;
-        var fpl = seen > 0 ? (failed + m.MidpointFpl * m.PriorLaps) / seen : m.MidpointFpl;
-        return Math.Round(m.Max * m.MidpointFpl / (m.MidpointFpl + fpl), 2);
+        if (seen <= 0)
+            return Math.Round(m.Max * m.MidpointFpl / (m.MidpointFpl + m.MidpointFpl), 2);
+        if (m.CrashWeightMin == m.CrashWeightMax)
+        {
+            // One weight for every CR, as every site before the sliding weight had.
+            var fpl = (failed * m.CrashWeightMin + m.MidpointFpl * m.PriorLaps) / seen;
+            return Math.Round(m.Max * m.MidpointFpl / (m.MidpointFpl + fpl), 2);
+        }
+        double lo = 0.0, hi = m.Max;
+        for (var i = 0; i < 60; i++)
+        {
+            var mid = (lo + hi) / 2;
+            var fpl = (failed * Weight(m, mid) + m.MidpointFpl * m.PriorLaps) / seen;
+            if (m.Max * m.MidpointFpl / (m.MidpointFpl + fpl) > mid)
+                lo = mid;
+            else
+                hi = mid;
+        }
+        return Math.Round(lo, 2);
     }
+
+    /// <summary>What one failed attempt weighs at this CR: little at the bottom of the ladder, more at the top.</summary>
+    public static double Weight(CrModel m, double cr) =>
+        Math.Max(m.CrashWeightMin, Math.Min(m.CrashWeightMax, m.CrashWeightMin + (cr - m.CrashWeightFromCr) * m.CrashWeightPerCr));
 
     public static Rung License(CrModel m, double cr, int laps)
     {

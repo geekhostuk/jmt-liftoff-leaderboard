@@ -103,6 +103,34 @@ internal static class CurrentTrack
         return null;
     }
 
+    /// <summary>
+    /// Where a respawned drone is put: the container's <c>DroneSpawnPoint</c>. Null while no
+    /// course is loaded, and then the container is looked for every couple of seconds at most.
+    /// </summary>
+    public static Vector3? SpawnPoint()
+    {
+        _containerType ??= AccessTools.TypeByName("CurrentContentContainer");
+        if (_containerType == null)
+            return null;
+        if (_container == null || Member(_container, "Level") == null)
+        {
+            var now = Time.realtimeSinceStartup;
+            if (now < _nextLook)
+                return null;
+            _container = FindLive(_containerType);
+            if (_container == null)
+            {
+                _nextLook = now + 2f;
+                return null;
+            }
+        }
+        return Member(_container, "DroneSpawnPoint") is Component point && point != null
+            ? point.transform.position
+            : null;
+    }
+
+    private static float _nextLook;
+
     private static IReadOnlyList<string> EnvironmentNames(object? environment)
     {
         var names = new List<string>();

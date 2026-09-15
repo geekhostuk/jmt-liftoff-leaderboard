@@ -24,6 +24,11 @@ All notable changes to this project are documented here. The format is based on
   - Your splits are written to disk in the background when a lap sets a best, rather than
     as you cross the line.
   - A scene with no flying HUD is searched for one once a second, not at every gate.
+- **Your CR in flight follows the site's new rules.**
+  - A reset before your drone leaves the start is not a failed attempt, and one after it is
+    timed from when you left, as a JMT room's host (JmtLiftoffMod 1.5.0) now times it.
+  - A failed attempt costs less while your CR is low and more as it climbs, so C is easy
+    to hold and A and Pro take cleaner flying. The weights come from the site.
 
 ## [0.5.0] — 2026-09-14
 
