@@ -4,7 +4,10 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows
 [Semantic Versioning](https://semver.org/) — see [docs/versioning.md](docs/versioning.md).
 
-## [Unreleased]
+## [0.6.0] — 2026-09-15
+
+Your CR follows the site's new rules while you fly, and the plugin does less on the game's
+main thread and logs any frame that stutters.
 
 ### Added
 
