@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows
 [Semantic Versioning](https://semver.org/) — see [docs/versioning.md](docs/versioning.md).
 
+## [Unreleased]
+
+### Added
+
+- **Slow frames are logged.** Everything the game calls the plugin through is timed. A frame
+  far slower than the usual one (three times as long, and at least 25 ms) while you're on a
+  course is written to the BepInEx log as `Perf: slow frame`, with how much of it was the
+  plugin's own code and whether a garbage collection ran, and every five minutes of flying a
+  `Perf:` summary follows.
+
+### Changed
+
+- **Less work on the game's main thread while you fly.**
+  - Answers from the JMT site are read on a worker thread. The board, the live room and the
+    room list arrive several times a minute, and a board can be tens of kilobytes.
+  - The course being flown is read from the game object that holds it, kept rather than
+    searched for among every loaded object twice every ten seconds.
+  - Your splits are written to disk in the background when a lap sets a best, rather than
+    as you cross the line.
+  - A scene with no flying HUD is searched for one once a second, not at every gate.
+
 ## [0.5.0] — 2026-09-14
 
 ### Added

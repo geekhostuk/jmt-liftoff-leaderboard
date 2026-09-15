@@ -75,11 +75,17 @@ public sealed class Plugin : BaseUnityPlugin
             delta,
             new RaceTracker(site, me, room, laps));
 
+        FrameProbe.Install();
         Logger.LogInfo($"{PluginName} {BuildMarker} loaded; reading {settings.BaseUrl}");
     }
 
+    // Splits are written in the background; the last lap's shouldn't be lost to quitting.
+    private void OnApplicationQuit() => SplitStore.Flush();
+
     private void Update()
     {
+        FrameProbe.Tick(counting: _hud?.InFlight == true);
+        using var probe = FrameProbe.Measure(FrameProbe.Part.Frame);
         _overlay?.Tick();
         try
         {

@@ -55,6 +55,7 @@ internal sealed class TrackRef
 internal static class CurrentTrack
 {
     private static Type? _containerType;
+    private static UnityEngine.Object? _container;
 
     public static TrackRef? Read()
     {
@@ -64,26 +65,40 @@ internal static class CurrentTrack
             if (_containerType == null)
                 return null;
 
-            // FindObjectsOfTypeAll rather than FindObjectOfType: the container may sit on
-            // an inactive object. The live one is whichever has a level loaded.
-            foreach (var container in Resources.FindObjectsOfTypeAll(_containerType))
-            {
-                if (container == null || Member(container, "Level") == null)
-                    continue;
-                var race = Member(container, "Race");
-                var track = Member(container, "Track");
-                if (race == null && track == null)
-                    continue;
+            // Finding it walks every object the game has loaded, so the live one is kept and
+            // only looked for again once it is gone or holds no level. It outlives a track change.
+            if (_container == null || Member(_container, "Level") == null)
+                _container = FindLive(_containerType);
+            var container = _container;
+            if (container == null)
+                return null;
+            var race = Member(container, "Race");
+            var track = Member(container, "Track");
+            if (race == null && track == null)
+                return null;
 
-                var id = WorkshopId(race) ?? WorkshopId(track);
-                var trackName = Member(track, "Name") as string ?? "";
-                var name = Member(race, "Name") as string ?? trackName;
-                return new TrackRef(id, name, trackName, EnvironmentNames(Member(container, "Environment")));
-            }
+            var id = WorkshopId(race) ?? WorkshopId(track);
+            var trackName = Member(track, "Name") as string ?? "";
+            var name = Member(race, "Name") as string ?? trackName;
+            return new TrackRef(id, name, trackName, EnvironmentNames(Member(container, "Environment")));
         }
         catch (Exception ex)
         {
             Plugin.Log.LogWarning($"Couldn't read the course being flown: {ex.Message}");
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// FindObjectsOfTypeAll rather than FindObjectOfType: the container may sit on an inactive
+    /// object. The live one is whichever has a level loaded.
+    /// </summary>
+    private static UnityEngine.Object? FindLive(Type containerType)
+    {
+        foreach (var container in Resources.FindObjectsOfTypeAll(containerType))
+        {
+            if (container != null && Member(container, "Level") != null)
+                return container;
         }
         return null;
     }

@@ -31,6 +31,7 @@ internal static class GateHook
     private static Type? _droneType;
     private static PropertyInfo? _currentDrone;
     private static UnityEngine.Object? _hud;
+    private static float _nextHudLook;
     private static PropertyInfo? _id;
     private static PropertyInfo? _lap;
     private static PropertyInfo? _time;
@@ -94,6 +95,7 @@ internal static class GateHook
 
     private static void Postfix(object __instance)
     {
+        using var probe = FrameProbe.Measure(FrameProbe.Part.Gates);
         try
         {
             if (__instance == null || !Mine(__instance))
@@ -129,8 +131,15 @@ internal static class GateHook
     {
         if (_droneType == null || _currentDrone == null || _hudType == null)
             return true;
-        if (_hud == null)
+        // A search of the scene, so a scene with no HUD is searched once a second rather than
+        // at every gate of every drone. A HUD gone with its scene is looked for straight away.
+        var now = UnityEngine.Time.realtimeSinceStartup;
+        if (_hud == null && now >= _nextHudLook)
+        {
             _hud = UnityEngine.Object.FindObjectOfType(_hudType);
+            if (_hud == null)
+                _nextHudLook = now + 1f;
+        }
         var current = _hud != null ? _currentDrone.GetValue(_hud, null) : null;
         if (current == null)
             return true;

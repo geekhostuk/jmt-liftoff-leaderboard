@@ -276,6 +276,7 @@ internal sealed class RoomLaps : IInRoomCallbacks, IMatchmakingCallbacks
     /// <summary>Photon calls every listener in a loop, the game's own among them: nothing thrown here may reach it.</summary>
     private void Safely(Action action)
     {
+        using var probe = FrameProbe.Measure(FrameProbe.Part.Room);
         try
         {
             action();

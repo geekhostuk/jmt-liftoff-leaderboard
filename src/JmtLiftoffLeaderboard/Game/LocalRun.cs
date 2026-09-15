@@ -282,6 +282,7 @@ internal sealed class LocalRun : IInRoomCallbacks, IMatchmakingCallbacks
     /// </summary>
     private void Safely(Action action)
     {
+        using var probe = FrameProbe.Measure(FrameProbe.Part.Room);
         try
         {
             action();

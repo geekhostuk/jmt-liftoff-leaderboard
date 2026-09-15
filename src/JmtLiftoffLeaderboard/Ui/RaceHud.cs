@@ -139,6 +139,9 @@ internal sealed class RaceHud
         };
     }
 
+    /// <summary>Whether a course is loaded and the pilot could be on it.</summary>
+    public bool InFlight => _inFlight;
+
     /// <summary>Called every frame by the plugin.</summary>
     public void Tick()
     {

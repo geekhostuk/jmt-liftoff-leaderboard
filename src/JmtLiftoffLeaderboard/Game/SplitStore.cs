@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using BepInEx;
 using Newtonsoft.Json;
 
@@ -36,6 +37,7 @@ internal static class SplitStore
 
     public static CourseSplits Load(string key, string name)
     {
+        Flush();
         var path = PathFor(key);
         try
         {
@@ -58,16 +60,51 @@ internal static class SplitStore
         return new CourseSplits { Name = name };
     }
 
-    /// <summary>Written beside the old file and swapped in, so a crash mid-write never loses the best lap.</summary>
+    /// <summary>
+    /// Written beside the old file and swapped in, so a crash mid-write never loses the best
+    /// lap. It's saved as a lap ends, as the pilot flies on into the next one, so only the
+    /// snapshot is taken here and the disk is left to a worker thread; the writes queue up
+    /// behind each other, so an older lap never lands on a newer one.
+    /// </summary>
     public static void Save(string key, CourseSplits course)
     {
+        string text;
         try
         {
-            JsonFile.Write(PathFor(key), JsonConvert.SerializeObject(course, Json));
+            text = JsonConvert.SerializeObject(course, Json);
         }
         catch (Exception ex)
         {
             Plugin.Log.LogWarning($"HUD: couldn't save your splits for {course.Name}: {ex.Message}");
+            return;
+        }
+        var path = PathFor(key);
+        var name = course.Name;
+        _writing = _writing.ContinueWith(_ =>
+        {
+            try
+            {
+                JsonFile.Write(path, text);
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"HUD: couldn't save your splits for {name}: {ex.Message}");
+            }
+        }, TaskScheduler.Default);
+    }
+
+    private static Task _writing = Task.CompletedTask;
+
+    /// <summary>Waits, briefly, for splits still being written.</summary>
+    public static void Flush()
+    {
+        try
+        {
+            _writing.Wait(TimeSpan.FromSeconds(2));
+        }
+        catch
+        {
+            // Each write reports its own failure.
         }
     }
 

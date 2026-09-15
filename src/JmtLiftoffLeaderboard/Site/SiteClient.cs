@@ -1,7 +1,9 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using BepInEx.Logging;
+using JmtLiftoffLeaderboard.Game;
 using Newtonsoft.Json;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -165,16 +167,23 @@ internal sealed class SiteClient
         var result = new Result<T> { Status = request.responseCode };
         if (request.result == UnityWebRequest.Result.Success)
         {
-            try
+            // Read on a worker thread: several of these arrive a minute while the pilot flies,
+            // and a board can run to tens of kilobytes. The answer is picked up here, on the
+            // main thread, a frame or so later.
+            var text = request.downloadHandler.text;
+            var parse = Task.Run(() => JsonConvert.DeserializeObject<T>(text, Json));
+            while (!parse.IsCompleted)
+                yield return null;
+            if (parse.Status == TaskStatus.RanToCompletion)
             {
-                result.Value = JsonConvert.DeserializeObject<T>(request.downloadHandler.text, Json);
+                result.Value = parse.Result;
                 if (result.Value != null)
                     _answers[url] = (Time.realtimeSinceStartup, result.Value);
             }
-            catch (Exception ex)
+            else
             {
                 result.Error = "The JMT site sent something this version can't read. An update may fix it.";
-                _log.LogWarning($"Could not read {url}: {ex.Message}");
+                _log.LogWarning($"Could not read {url}: {parse.Exception?.GetBaseException().Message}");
             }
         }
         else if (request.responseCode != 404)
@@ -215,6 +224,7 @@ internal sealed class SiteClient
 
     private void Deliver<TArg>(Action<TArg> callback, TArg value)
     {
+        using var probe = FrameProbe.Measure(FrameProbe.Part.Site);
         try
         {
             callback(value);
